@@ -9,105 +9,134 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.util.Scanner;
 
+import javax.swing.JOptionPane;
+import javax.swing.UnsupportedLookAndFeelException;
 
 public class Client {
 	private Selector selector;
 	private InetSocketAddress serverAddress;
 	private SocketChannel socketChannel;
-	
+
 	private final int BLOCK = 1024;
 	private final ByteBuffer sendBuffer = ByteBuffer.allocate(BLOCK);
 	private final ByteBuffer receiveBuffer = ByteBuffer.allocate(BLOCK);
-	
+
 	private Charset charset = Charset.forName("UTF-8");
-	private Scanner scanner = new Scanner(System.in);
+
 	private static boolean isSignIn;
-	
+
+	private SignInView signInView;
+
 	public Client(InetSocketAddress socketAddress) {
 		this.serverAddress = socketAddress;
 	}
-	
-	private void socketChannelInfo() throws IOException{
+
+	private void socketChannelInfo() throws IOException {
 		selector = Selector.open();
 		socketChannel = SocketChannel.open();
 		socketChannel.configureBlocking(false);
 		socketChannel.register(selector, SelectionKey.OP_CONNECT);
 		socketChannel.connect(serverAddress);
+
+		try {
+			infoSignInView();
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		} catch (InstantiationException e) {
+			e.printStackTrace();
+		} catch (IllegalAccessException e) {
+			e.printStackTrace();
+		} catch (UnsupportedLookAndFeelException e) {
+			e.printStackTrace();
+		}
 	}
-	
-	public void start() throws IOException{
-		
+
+	private void infoSignInView() throws ClassNotFoundException, InstantiationException, IllegalAccessException,
+			UnsupportedLookAndFeelException {
+
+		for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+			if ("Nimbus".equals(info.getName())) {
+				javax.swing.UIManager.setLookAndFeel(info.getClassName());
+				break;
+			}
+		}
+		signInView = new SignInView(socketChannel, sendBuffer);
+		signInView.setLocationRelativeTo(null);
+		signInView.setVisible(true);
+	}
+
+	public void start() throws IOException {
+
 		socketChannelInfo();
 		Thread read = new Thread(new read());
 		read.start();
-		String line = "";
-		while(!read.isInterrupted() && (line = scanner.nextLine()) != null){
-			sendBuffer.putInt(line.getBytes().length);
-			sendBuffer.put(charset.encode(line).array(), 0, line.getBytes().length);
-			sendBuffer.flip();
-			while(sendBuffer.hasRemaining()) {
-				socketChannel.write(sendBuffer);
-			}
-			sendBuffer.clear();
-		}
+
+		// while (true){
+		//
+		// }
+		// Scanner scanner = new Scanner(System.in);
+		// String line = "";
+		// while(!read.isInterrupted() && (line = scanner.nextLine()) != null){
+		// sendBuffer.putInt(line.getBytes().length);
+		// sendBuffer.put(charset.encode(line).array(), 0,
+		// line.getBytes().length);
+		// sendBuffer.flip();
+		// while(sendBuffer.hasRemaining()) {
+		// socketChannel.write(sendBuffer);
+		// }
+		// sendBuffer.clear();
+		// }
 	}
-	
+
 	private class read implements Runnable {
-		
+
 		@Override
 		public void run() {
-			isSignIn = false;
 			try {
-				while (true){
-					selector.select();
-					for(SelectionKey selectionKey : selector.selectedKeys()){
+				while (selector.select() > 0) {
+					for (SelectionKey selectionKey : selector.selectedKeys()) {
 						selector.selectedKeys().remove(selectionKey);
-						if (selectionKey.isConnectable()){
+						if (selectionKey.isConnectable()) {
 							System.out.println("client connect");
 							socketChannel = (SocketChannel) selectionKey.channel();
-							if (socketChannel.isConnectionPending()){
+							if (socketChannel.isConnectionPending()) {
 								socketChannel.finishConnect();
 								System.out.println("achieve connectionPending");
 							}
-						}
-						else if (selectionKey.isReadable()){
-							SocketChannel keyChannel = (SocketChannel)selectionKey.channel();
-							
+						} else if (selectionKey.isReadable()) {
+
+							SocketChannel keyChannel = (SocketChannel) selectionKey.channel();
+
 							keyChannel.socket().sendUrgentData(0);
-							
+
 							receiveBuffer.clear();
-							if (isSignIn){
-			//					System.out.println("signins");
+							if (isSignIn) {
 								handleMessage(readMessage(keyChannel));
+							} else {
+								handleSigninMessage(readMessage(keyChannel));
 							}
-							else{
-								isSignIn = handleSigninMessage(readMessage(keyChannel));
-								if (isSignIn == true)
-									System.out.println("Already connect to server");
-								else
-									System.out.println("not connect to server");
-							}
-							selectionKey.interestOps(SelectionKey.OP_READ);
 						}
+						selectionKey.interestOps(SelectionKey.OP_READ);
 					}
-					socketChannel.register(selector, SelectionKey.OP_READ);
+					// socketChannel.register(selector, SelectionKey.OP_READ);
 				}
+				System.out.println("read is end");
 			} catch (IOException e) {
 				Thread.currentThread().interrupt();
 				System.err.println("The server is error ");
 			}
 		}
 	}
-	
-	private String readMessage(SocketChannel keyChannel){
+
+	private String readMessage(SocketChannel keyChannel) {
 		String line = "";
 		try {
 			int rlen = 0;
 			receiveBuffer.position(0);
 			receiveBuffer.limit(4);
 			int tmp = 0;
-			while(true){
-//				System.out.println("while 1");
+			while (true) {
+				// System.out.println("while 1");
 				rlen = keyChannel.read(receiveBuffer);
 				receiveBuffer.flip();
 				if (rlen != 0 && rlen != -1)
@@ -120,10 +149,10 @@ public class Client {
 			receiveBuffer.position(0);
 			rlen = 0;
 			tmp = 0;
-			while (true){
-			//	System.out.println("whlie 2");
+			while (true) {
+				// System.out.println("whlie 2");
 				rlen = keyChannel.read(receiveBuffer);
-				if (rlen != 0 && rlen != -1){
+				if (rlen != 0 && rlen != -1) {
 					tmp += rlen;
 					receiveBuffer.flip();
 					line += charset.decode(receiveBuffer);
@@ -135,42 +164,49 @@ public class Client {
 		} catch (IOException e) {
 			System.err.println(e);
 		}
-//		System.out.println("line: " + line);
+		System.out.println("line: " + line);
 		return line;
 	}
-	
-	private boolean handleSigninMessage(String message){
-		boolean result = false;
+
+	private void handleSigninMessage(String message) {
 		String protocol = message.split(":")[0];
 		String content = message.split(":")[1];
-		if (("signin").equals(protocol))
-			if (("succeed").equals(content))
-				result = true;
-			else
-				result = false;
-		return result;
+		if (("signin").equals(protocol)) {
+			if (("ok").equals(content)) {
+				isSignIn = true;
+				System.out.println("Already connect to server");
+				signInView.dispose();
+			} else {
+				isSignIn = false;
+				JOptionPane.showMessageDialog(null, "账号或密码错误！");
+			}
+		}
+		if (("signup").equals(protocol))
+			if (content.equals("failed")) {
+				JOptionPane.showMessageDialog(null, "注册失败！");
+			} else {
+				JOptionPane.showMessageDialog(null, "您的账号是： " + content);
+				signInView.disposeSignUpView();
+			}
 	}
-	
-	private void handleMessage(String message){
+
+	private void handleMessage(String message) {
 		int index = message.indexOf(":");
 		String content = message.substring(index + 1, message.length());
 		String tmp = message.substring(0, index);
 		String protocol = tmp.split("-")[0];
-		if (("person").equals(protocol)){
+		if (("person").equals(protocol)) {
 			String fromName = tmp.split("-")[1];
 			System.out.println(fromName + " : " + content);
-		}
-		else if ("group".equals(protocol)){
+		} else if ("group".equals(protocol)) {
 			String fromName = tmp.split("-")[1];
 			System.out.println(fromName + " : " + content);
-		}
-		else {
+		} else {
 			System.out.println(message);
 		}
 	}
-	
-	
-	public static void main(String[] args){
+
+	public static void main(String[] args) {
 		InetSocketAddress socketAddress = new InetSocketAddress("localhost", 6789);
 		Client client = new Client(socketAddress);
 		try {
