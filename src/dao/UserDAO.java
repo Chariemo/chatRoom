@@ -36,6 +36,12 @@ public class UserDAO implements IUserDAO {
 		}
 		System.out.println("random_account: " + random_account); 
 		user.setUser_account(random_account);
+		if (" ".equals(user.getUser_email())) {
+			user.setUser_email(null);
+		}
+		if (" ".equals(user.getUser_tel())) {
+			user.setUser_tel(null);
+		}
 		
 		Connection connection = ConnectionManager.getInstance().getConnection();
 		PreparedStatement pStatement = null;
