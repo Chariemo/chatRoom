@@ -24,6 +24,7 @@ import dao.UserDAO;
 import idao.DAOFactory;
 import model.User;
 import model.Friend;
+import model.Group;
 import model.MessageCache;
 
 public class Server {
@@ -251,7 +252,7 @@ public class Server {
 						ispacketHead = true;
 					}
 				}
-			}
+			}	
 		}
 		
 		private void forwardData(ByteBuffer buffer) throws IOException {
@@ -271,7 +272,6 @@ public class Server {
 				strMessage = Message.substring(index + 1, Message.length());
 				arrayHead = Message.substring(0, index).split("-");
 			}
-			
 			
 			if ("signin".equals(arrayHead[0])) {
 				
@@ -311,7 +311,7 @@ public class Server {
 		//登录
 		private void signIn(String[] arrayHead) throws IOException {
 			
-			String strResponse = null;
+			String strResponse = "signin:";
 			String user_account = null;
 			String user_passwd = null;
 			boolean verification = false;
@@ -324,7 +324,7 @@ public class Server {
 				
 				if (user != null && userOnline.containsKey(user.getUser_account())) {
 					
-					strResponse = "signin:Already Sign In!";
+					strResponse += "Already Sign In!";
 				}
 				else {
 					
@@ -333,7 +333,7 @@ public class Server {
 					if (verification) {
 						
 						System.out.println("Pass");
-						strResponse = "signin:ok";
+						strResponse += "succeed";
 						user.setClient(client);
 						addUserOnline(user.getUser_account(), user);
 						
@@ -341,12 +341,12 @@ public class Server {
 					else {
 						
 						System.out.println("Failed");
-						strResponse = "signin:failed";
+						strResponse += "failed";
 					}
 				}
 			} else {
 				
-				strResponse = "signin:Wrong Account";
+				strResponse += "Protocol Wrong";
 			}
 			
 			sendPacket(client, strResponse);
@@ -388,6 +388,11 @@ public class Server {
 				newUser.setUser_email(arrayHead[4]);
 				newUser.setUser_icon(arrayHead[5]);
 			}
+			else {
+				
+				sendPacket(client, "signup:Protocol Wrong");
+				return;
+			}
 			
 			String strResponse = null;
 			String random_account = null;
@@ -409,32 +414,39 @@ public class Server {
 		//注销
 		private void signOff(String[] arrrayHead) throws IOException {
 			
-			String strResponse = null;
+			String strResponse = "signoff:";
 			User user = null;
 			if (arrrayHead.length > 1) {
 				
 				user = userOnline.get(arrrayHead[1]);
 			}
+			else {
+				
+				sendPacket(client, "signoff:Protocol Wrong");
+				return;
+			}
+			
 			if (user == null || !user.getClient().equals(client)) {
 				
-				strResponse = "signoff:Wrong Account";
+				strResponse += "Wrong Account";
+				sendPacket(client, strResponse);
 			}
 			else {
 				
 				if (userDAO.delete(user.getUser_account()))	{
 					
 					delUserOnline(client);
-					strResponse = "signoff:ok";
+					strResponse += "succeed";
+					sendPacket(client, strResponse);
+					client.close();
 				}
 				else {
 					
-					strResponse = "signOff:failed";
+					strResponse += "failed";
+					sendPacket(client, strResponse);
 				}
 			}
 			System.out.println(strResponse);
-			sendPacket(client, strResponse);
-			client.close();
-			
 		}
 		
 		//单发
@@ -443,8 +455,16 @@ public class Server {
 			StringBuilder messageResponse = new StringBuilder();
 			User target = userDAO.searchUserByCondition(to_account);
 			SocketChannel clientTarget = null;
+			User from_user = userOnline.get(from_account);
+			
+			if (from_account == null || !client.equals(from_user.getClient())) {
+				
+				sendPacket(clientTarget, "person:Wrong Account");
+				return;
+			}
 			if (target == null) {
 				
+				sendPacket(clientTarget, "person:There is Who?");
 				return;
 			}
 			
@@ -468,24 +488,27 @@ public class Server {
 		//组发
 		private void groupForward(String strMessage, String[] arrayHead) throws IOException {
 			
-			String target_account = null;
+			String from_account = null;
 			int group_id  = 0;
 			if (arrayHead.length > 2) {
 				
-				target_account = arrayHead[1];
+				from_account = arrayHead[1];
 				group_id = Integer.parseInt(arrayHead[2]);
 			}
 			else {
-				sendPacket(client, "group:Protocol Wrong");
+				sendPacket(client, "groupErr:Protocol Wrong");
 				return;
 			}
 			
 			
-			List<User> groupUsers = groupDAO.searchAllUsersByGroup(group_id, target_account);
+			List<User> groupUsers = groupDAO.searchAllUsersByGroup(group_id, from_account);
+			if (groupUsers == null || groupUsers.isEmpty()) {
+				sendPacket(client, "groupErr:Wrong Account Or GroupId");
+				return;
+			}
 			for (User user : groupUsers) {
 				
-				System.out.println(user);
-				singleForward(target_account, user.getUser_account(), strMessage, "group");
+				singleForward(from_account, user.getUser_account(), strMessage, "group");
 			}			
 		}
 		
@@ -523,7 +546,7 @@ public class Server {
 						user.setUser_icon(arrayHead[7]);
 						if (userDAO.update(user)) {
 							
-							sendPacket(client, "modifyUser-update:ok");
+							sendPacket(client, "modifyUser-update:succeed");
 							return;
 						}
 						else {
@@ -534,12 +557,12 @@ public class Server {
 					}	
 				}
 			}
-			sendPacket(client, "modifyUser-update:Wrong");
+			sendPacket(client, "modifyUser-update:Protocol Wrong");
 		}
 		
 		private void modifyFriend(String[] arrayHead) throws IOException {
 			
-			String strResponse = null;
+			String strResponse = "modifyfriend";
 			String method = null;
 			Friend friend = new Friend(); 
 			if (arrayHead.length > 4) {
@@ -560,59 +583,99 @@ public class Server {
 				if ("add".equals(method)) {
 					
 					if (friendDAO.addFriend(friend)) {
-						strResponse = "modifyfriend:Add friend " + friend.getFriend_account() + " successed!";	
+						strResponse += ("-Add friend " + friend.getFriend_account() + " succeed");	
 					}
 					else {
-						strResponse = "modifyfriend:Add friend " + friend.getFriend_account() + " failed!";
+						strResponse += ("-Add friend " + friend.getFriend_account() + " failed");
 					}
 				}
 				else if ("update".equals(method)) {
 					
 					if (friendDAO.updateFriend(friend)) {
-						strResponse = "modifyfriend:Update friend " + friend.getFriend_account() + " successed!";
+						strResponse += ("-Update friend " + friend.getFriend_account() + " succeed");
 					}
 					else {
-						strResponse = "modifyfriend:Update friend " + friend.getFriend_account() + " failed!";
+						strResponse += ("-Update friend " + friend.getFriend_account() + " failed");
 					}
 				}
 				else if ("delete".equals(method)){
 					
 					if (friendDAO.deleteFriendByAccount(friend.getUser_account(), friend.getFriend_account())) {
-						strResponse = "modifyfriend:Delete friend " + friend.getFriend_account() + " successed!";
+						strResponse += ("-Delete friend " + friend.getFriend_account() + " succeed");
 					}
 					else {
-						strResponse = "modifyfriend:Delete friend " + friend.getFriend_account() + " failed!";
+						strResponse += ("-Delete friend " + friend.getFriend_account() + " failed");
 					}
 				}
 				else if ("deleteall".equals(method)){
 					
 					if (friendDAO.deleteAllFriends(user.getUser_account())) {
-						strResponse = "modifyfriend:Delete all friend " + friend.getFriend_account() + " successed!";
+						strResponse += ("-Delete all friend " + friend.getFriend_account() + " succeed");
 					}
 					else {
-						strResponse = "modifyfriend:Delete all friend " + friend.getFriend_account() + " failed!";
+						strResponse += ("-Delete all friend " + friend.getFriend_account() + " failed");
 					}
 				}
 			}
 			else {
-				strResponse = "modifyfriend:Wrong Account";
+				strResponse += ":Wrong Account";
 			}
 			System.out.println(strResponse);
 			sendPacket(client, strResponse);
 		}
 		
-		private void modifyGroup(String[] arrayHead) {
+		private void modifyGroup(String[] arrayHead) throws IOException {
 			
-			String method = arrayHead[1];
-			if ("add".equals(method)) {
-
-			}
-			else if ("update".equals(method)) {
+			String method = null;
+			String strResponse = "modifygroup";
+			Group group = new Group();
+			if (arrayHead.length > 4) {
 				
+				method = arrayHead[1];
+				group.setUser_account(arrayHead[2]);
+				group.setGroup_id(Integer.parseInt(arrayHead[3]));
+				group.setGroup_name(arrayHead[4]);
 			}
 			else {
 				
+				sendPacket(client, "modifygroup: Wrong Protocol");
+				return;
 			}
+			
+			User user = userOnline.get(group.getUser_account());
+			if (user == null || !client.equals(user.getClient())) {
+				
+				sendPacket(client, "modifygroup: Wrong Account");
+				return;
+			}
+			if ("add".equals(method)) {
+				
+				if (groupDAO.createGroup(group)) {
+					strResponse += "-add:succeed";
+				}
+				else {
+					strResponse += "-add:failed";
+				}
+			}
+			else if ("update".equals(method)) {
+				
+				if (groupDAO.updateGroup(group)) {
+					strResponse += "-update:succeed";
+				}
+				else {
+					strResponse += "-update:failed";
+				}
+			}
+			else {
+				
+				if (groupDAO.deleteGroup(group.getGroup_id(), group.getUser_account())) {
+					strResponse += "-delete:succeed";
+				}
+				else {
+					strResponse += "-delete:failed";
+				}
+			}
+			sendPacket(client, strResponse);
 		}
 		
 	}

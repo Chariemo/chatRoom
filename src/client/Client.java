@@ -144,7 +144,7 @@ public class Client {
 		String protocol = message.split(":")[0];
 		String content = message.split(":")[1];
 		if (("signin").equals(protocol))
-			if (("ok").equals(content))
+			if (("succeed").equals(content))
 				result = true;
 			else
 				result = false;

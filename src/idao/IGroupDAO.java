@@ -7,11 +7,11 @@ import model.User;
 
 public interface IGroupDAO {
 	
-	public boolean creatGroup(Group group, String user_account);
+	public boolean createGroup(Group group);
 	
 	public boolean deleteGroup(int group_id, String user_account);
 	
-	public boolean updateGroup(Group group, String user_account);
+	public boolean updateGroup(Group group);
 	
 	public User searchUserInGroup(int group_id, String user_account, String find_account);
 	

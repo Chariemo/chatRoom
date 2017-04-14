@@ -21,7 +21,7 @@ public class GroupDAO implements IGroupDAO {
 	
 	@SuppressWarnings("finally")
 	@Override
-	public boolean creatGroup(Group group, String user_account) {
+	public boolean createGroup(Group group) {
 		boolean result = false;
 		if (cantainsGroup(group.getGroup_id()))
 			return result;
@@ -32,10 +32,9 @@ public class GroupDAO implements IGroupDAO {
 		try {
 			pStatement = connection.prepareStatement(sql);
 			pStatement.setInt(1, group.getGroup_id());
-			pStatement.setString(2, user_account);
+			pStatement.setString(2, group.getUser_account());
 			pStatement.setString(3, group.getGroup_name());
 			pStatement.setInt(4, GROUP_LORD);
-			System.out.println("sadfsf");
 			pStatement.executeUpdate();
 			result = true;
 		} catch (SQLException e) {
@@ -73,19 +72,18 @@ public class GroupDAO implements IGroupDAO {
 
 	@SuppressWarnings("finally")
 	@Override
-	public boolean updateGroup(Group group, String user_account) {
+	public boolean updateGroup(Group group) {
 		boolean result = false;
-		int userAuth = userAuthory(group.getGroup_id(), user_account);
+		int userAuth = userAuthory(group.getGroup_id(), group.getUser_account());
 		if (userAuth == NOTIN_GROUP || userAuth == GROUP_MEMBER)
 			return result;
 		Connection connection = ConnectionManager.getInstance().getConnection();
 		PreparedStatement pStatement = null;
-		String sql = "update crgroup set group_name = ?, user_authory = ? where group_id = ?";
+		String sql = "update crgroup set group_name = ? where group_id = ?";
 		try {
 			pStatement = connection.prepareStatement(sql);
 			pStatement.setString(1, group.getGroup_name());
-			pStatement.setInt(2, group.getUser_authory());
-			pStatement.setInt(3, group.getGroup_id());
+			pStatement.setInt(2, group.getGroup_id());
 			
 			pStatement.executeUpdate();
 			result = true;
@@ -206,7 +204,6 @@ public class GroupDAO implements IGroupDAO {
 			if (!resultSet.next())
 				return userAuthory;
 			else {
-				System.out.println("true");
 				userAuthory = resultSet.getInt("user_authory");
 				
 			}
