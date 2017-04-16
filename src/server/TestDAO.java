@@ -4,6 +4,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import com.sun.org.apache.bcel.internal.generic.NEW;
+
 import dao.MessageCacheDAO;
 import dao.UserDAO;
 import idao.DAOFactory;
@@ -36,11 +38,14 @@ public class TestDAO {
 		friendDAO.addFriend(friend);
 		System.out.println(friendDAO.searchFriendsByRemark("654321", "charley").get(0));
 		*/
-		
-		MessageCacheDAO messageCacheDAO = (MessageCacheDAO) DAOFactory.createMessageCacheDAO();
-		MessageCache messageCache = new MessageCache();
-
+//		
+//		MessageCacheDAO messageCacheDAO = (MessageCacheDAO) DAOFactory.createMessageCacheDAO();
+//		MessageCache messageCache = new MessageCache();
+//
 //		messageCacheDAO.insert("123456", "654321", "nishishabi");
-		System.out.println(messageCacheDAO.searchMessageCache("654321").get(0).toString());
+//		System.out.println(messageCacheDAO.searchMessageCache("654321").get(0).toString());
+		
+		String start = "000001";
+		System.out.println(Integer.toString((Integer.parseInt(start) + 1)));
 	}
 }

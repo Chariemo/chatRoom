@@ -1,5 +1,6 @@
 package idao;
 
+import java.util.HashMap;
 import java.util.List;
 
 import model.Friend;
@@ -15,7 +16,7 @@ public interface IFriendDAO {
 	
 	public boolean updateFriend(Friend friend);
 	
-	public List<User> searchAllFriend(String user_account);
+	public HashMap<String, User> searchAllFriend(String user_account);
 	
 	public User searchFriendByAccount(String user_account, String friend_account);
 	

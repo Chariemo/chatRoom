@@ -157,7 +157,7 @@ public class SignInView extends javax.swing.JFrame {
 		System.out.println("signin: ");
 		String account = jTextField1.getText();
 		String passwd = jTextField2.getText();
-		String signInMessage = "signin-" + account + "-" + passwd;
+		String signInMessage = account + "-signin-" + passwd;
 		System.out.println("account: " + account + "passwd: " + passwd);
 		if (("").equals(account) || ("").equals(passwd))
 			JOptionPane.showMessageDialog(this, "请输入账号和密码！");

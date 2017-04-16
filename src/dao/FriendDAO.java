@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import idao.DAOFactory;
@@ -233,9 +234,9 @@ public class FriendDAO implements IFriendDAO{
 
 	@SuppressWarnings("finally")
 	@Override
-	public List<User> searchAllFriend(String user_account) {
+	public HashMap<String, User> searchAllFriend(String user_account) {
 		
-		List<User> result = new ArrayList<>();
+		HashMap<String, User> result = new HashMap<>();
 		if (user_account == null) {
 			return result;
 		}
@@ -263,7 +264,7 @@ public class FriendDAO implements IFriendDAO{
 				user.setUser_tel(resultSet.getString("user_tel"));
 				user.setUser_email(resultSet.getString("user_email"));
 				
-				result.add(user);
+				result.put(user.getUser_account(), user);
 				
 			}
 			

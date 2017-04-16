@@ -12,7 +12,6 @@ public class User {
 	private String user_tel;
 	private String user_email;
 	private SocketChannel client;
-	
 
 	public User() {
 		
@@ -96,14 +95,16 @@ public class User {
 	
 	
 	public int hashCode() {
-		return new Integer(user_id).hashCode();
+		return new Integer(user_account).hashCode();
 	}
 	
 	
 	public boolean equals(Object object) {
+		if (this == object)
+			return true;
 		if (object != null && object.getClass() == User.class) {
 			User target = (User) object;
-			return user_id == target.getUser_id();
+			return user_account == target.getUser_account();
 		}
 		return false;
 	}

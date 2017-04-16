@@ -13,6 +13,7 @@ import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -111,7 +112,7 @@ public class Server {
 							
 							finished = false;
 							key.attach(finished);
-							poolThread.execute(new MessageHandle(key));
+							poolThread.execute(new MessageHandler(key));
 						}	
 					}
 				}
@@ -122,12 +123,13 @@ public class Server {
 	}
 	
 	
-	class MessageHandle implements Runnable {
+	class MessageHandler implements Runnable {
 
 		private SocketChannel client;
 		private SelectionKey key;
+		User self = null;
 		
-		public MessageHandle(SelectionKey key) {
+		public MessageHandler(SelectionKey key) {
 			
 			this.client = (SocketChannel) key.channel();
 			this.key = key;
@@ -145,13 +147,9 @@ public class Server {
 				key.attach(finished);
 			} catch (IOException e) {
 				
+				friendsStatus(self, "logout");
 				delUserOnline(client);
-				try {
-					
-					System.err.println("User " + client.getRemoteAddress() + " disconnected");
-				} catch (IOException e1) {
-					
-				}
+				System.err.println("User " + self.getUser_name() + " disconnected");
 			} finally {		
 				
 				Thread.currentThread().interrupt();
@@ -262,46 +260,60 @@ public class Server {
 			int  index = Message.toString().indexOf(":");
 			String strMessage = null;
 			String[] arrayHead = null;
+			String protocol = null;
+			String account = null;
 			
 			if (index == -1) {
 				
 				arrayHead = Message.toString().split("-");
-			}
+			}  
 			else {
 				
 				strMessage = Message.substring(index + 1, Message.length());
 				arrayHead = Message.substring(0, index).split("-");
 			}
-			
-			if ("signin".equals(arrayHead[0])) {
+		
+			if (arrayHead.length > 1) {
+				protocol = arrayHead[1];
+				account = arrayHead[0];
+			}
+			if ("signin".equals(protocol)) {
 				
 				signIn(arrayHead);
 			}
-			else if ("signup".equals(arrayHead[0])) {
+			else if ("signup".equals(protocol)) {
 				
 				signUp(arrayHead);
 			}
-			else if ("signoff".equals(arrayHead[0])) {
+			
+			User user = userOnline.get(account);
+			if (user == null || !client.equals(user.getClient())) {
+				poolThread.execute(new SendPacket(client, "Wrong Account"));
+				return;
+			}
+			if ("signoff".equals(protocol)) {
 				
 				signOff(arrayHead);
 			}
-			else if ("person".equals(arrayHead[0])) {
+			else if ("person".equals(protocol)) {
 				
-				singleForward(arrayHead[1], arrayHead[2], strMessage, "person");
+				if (arrayHead.length > 2) {
+					singleForward(account, arrayHead[2], strMessage, "person");
+				}
 			}
-			else if ("group".equals(arrayHead[0])) {
+			else if ("group".equals(protocol)) {
 				
 				groupForward(strMessage, arrayHead);
 			}
-			else if ("modifyuser".equals(arrayHead[0])) {
+			else if ("modifyuser".equals(protocol)) {
 				
 				modifyUser(arrayHead);
 			}
-			else if ("modifyfriend".equals(arrayHead[0])) {
+			else if ("modifyfriend".equals(protocol)) {
 				
 				modifyFriend(arrayHead);
 			}
-			else if ("modifygroup".equals(arrayHead[0])) {
+			else if ("modifygroup".equals(protocol)) {
 				
 				modifyGroup(arrayHead);
 			}
@@ -311,20 +323,19 @@ public class Server {
 		//登录
 		private void signIn(String[] arrayHead) throws IOException {
 			
-			String strResponse = "signin:";
+			String strResponse = null;
 			String user_account = null;
 			String user_passwd = null;
 			boolean verification = false;
-			User user = null;
 			if (arrayHead.length > 2) {
 				
-				user_account = arrayHead[1];
+				user_account = arrayHead[0];
 				user_passwd = arrayHead[2];
-				user = userDAO.searchUserByCondition(user_account);
+				self = userDAO.searchUserByCondition(user_account);
 				
-				if (user != null && userOnline.containsKey(user.getUser_account())) {
+				if (self != null && userOnline.containsKey(self.getUser_account())) {
 					
-					strResponse += "Already Sign In!";
+					strResponse = user_account + "-signin:Already Sign In";
 				}
 				else {
 					
@@ -332,27 +343,65 @@ public class Server {
 					verification = userDAO.verify(user_account, user_passwd);
 					if (verification) {
 						
-						System.out.println("Pass");
-						strResponse += "succeed";
-						user.setClient(client);
-						addUserOnline(user.getUser_account(), user);
+						System.out.println("Pass\nUser " + self + "has signed In");
+						strResponse = user_account + "-signin:succeed";
+						self.setClient(client);
+						addUserOnline(self.getUser_account(), self);
 						
 					}
 					else {
 						
 						System.out.println("Failed");
-						strResponse += "failed";
+						strResponse = user_account + "-signin:failed";
 					}
 				}
 			} else {
 				
-				strResponse += "Protocol Wrong";
+				strResponse = "signin:Protocol Wrong";
 			}
 			
-			sendPacket(client, strResponse);
-			//获取并转发离线信息
+			poolThread.execute(new SendPacket(client, strResponse));
+			//用户登录后处理
 			if (verification) {
-				handleMessageCache(user);
+				
+				handleMessageCache(self);
+				friendsStatus(self, "login");
+			}
+		}
+		
+		
+		//传送朋友列表及上线提醒
+		private void friendsStatus(User meUser, String attach) {
+			
+			StringBuilder strResponse = new StringBuilder("friends:");
+			HashMap<String, User> friends = friendDAO.searchAllFriend(meUser.getUser_account());
+			User friend = null;
+			User friendOnline = null;
+			SocketChannel friendClient = null;
+			
+			if (!friends.isEmpty()) {
+				
+				Iterator<Entry<String, User>> friendIterator = friends.entrySet().iterator();
+				while (friendIterator.hasNext()) {
+					
+					friend = friendIterator.next().getValue();
+					strResponse.append(friend.getUser_account());
+					strResponse.append("-");
+					//TODO
+					if ((friendOnline = userOnline.get(friendIterator.next().getKey())) != null) {
+						strResponse.append("online"); //在线
+						
+						friendClient = friendOnline.getClient();
+						poolThread.execute(new SendPacket(friendClient, attach + "-" + friendOnline.getUser_account()));
+					}
+					else {
+						strResponse.append("notonline"); //不在线
+					}
+					strResponse.append(":");
+				}
+				if ("login".equals(attach)) {
+					poolThread.execute(new SendPacket(client, strResponse.toString()));
+				}
 			}
 		}
 		
@@ -368,7 +417,7 @@ public class Server {
 					data.append(messageCache.getFrom_account());
 					data.append(":");
 					data.append(messageCache.getContent());
-					sendPacket(client, data.toString());
+					poolThread.execute(new SendPacket(client, data.toString()));
 				}
 			}
 			
@@ -380,17 +429,16 @@ public class Server {
 			System.out.println("SignUp...");
 			User newUser = new User();
 			System.out.println("length: " + arrayHead.length);
-			if (arrayHead.length > 5) {
-				newUser.setUser_name(arrayHead[1]);
-				System.out.println(newUser.getUser_name());
-				newUser.setUser_passwd(arrayHead[2]);
-				newUser.setUser_tel(arrayHead[3]);
-				newUser.setUser_email(arrayHead[4]);
-				newUser.setUser_icon(arrayHead[5]);
+			if (arrayHead.length > 6) {
+				newUser.setUser_name(arrayHead[2]);
+				newUser.setUser_passwd(arrayHead[3]);
+				newUser.setUser_tel(arrayHead[4]);
+				newUser.setUser_email(arrayHead[5]);
+				newUser.setUser_icon(arrayHead[6]);
 			}
 			else {
 				
-				sendPacket(client, "signup:Protocol Wrong");
+				poolThread.execute(new SendPacket(client, "signup:Protocol Wrong"));
 				return;
 			}
 			
@@ -399,8 +447,7 @@ public class Server {
 			if (null != (random_account = userDAO.insert(newUser))) {
 				
 				System.out.println("Success");
-				
-				strResponse = "signup:" + random_account;
+				strResponse = random_account + "-signup:succeed";
 			}
 			else {
 				
@@ -408,81 +455,55 @@ public class Server {
 				strResponse = "signup:failed";
 			}
 			
-			sendPacket(client, strResponse);
+			poolThread.execute(new SendPacket(client, strResponse));
 		}
 		
 		//注销
 		private void signOff(String[] arrrayHead) throws IOException {
 			
 			String strResponse = "signoff:";
-			User user = null;
-			if (arrrayHead.length > 1) {
-				
-				user = userOnline.get(arrrayHead[1]);
-			}
-			else {
-				
-				sendPacket(client, "signoff:Protocol Wrong");
-				return;
-			}
 			
-			if (user == null || !user.getClient().equals(client)) {
+			if (userDAO.delete(self.getUser_account()))	{
 				
-				strResponse += "Wrong Account";
-				sendPacket(client, strResponse);
+				delUserOnline(client);
+				strResponse += "succeed";
+				poolThread.execute(new SendPacket(client, strResponse));
+				client.close();
 			}
 			else {
 				
-				if (userDAO.delete(user.getUser_account()))	{
-					
-					delUserOnline(client);
-					strResponse += "succeed";
-					sendPacket(client, strResponse);
-					client.close();
-				}
-				else {
-					
-					strResponse += "failed";
-					sendPacket(client, strResponse);
-				}
+				strResponse += "failed";
+				poolThread.execute(new SendPacket(client, strResponse));
 			}
-			System.out.println(strResponse);
 		}
 		
 		//单发
 		private void singleForward(String from_account, String to_account, String strMessage, String attach) throws IOException {
 			
 			StringBuilder messageResponse = new StringBuilder();
-			User target = userDAO.searchUserByCondition(to_account);
+			User toUser = userDAO.searchUserByCondition(to_account);
 			SocketChannel clientTarget = null;
-			User from_user = userOnline.get(from_account);
 			
-			if (from_account == null || !client.equals(from_user.getClient())) {
+			if (toUser == null) {
 				
-				sendPacket(clientTarget, "person:Wrong Account");
-				return;
-			}
-			if (target == null) {
-				
-				sendPacket(clientTarget, "person:There is Who?");
+				poolThread.execute(new SendPacket(clientTarget, "person:There is Who"));
 				return;
 			}
 			
-			if (!userOnline.containsKey(target.getUser_account())) {
+			if (!userOnline.containsKey(toUser.getUser_account())) {
 				
 				messageCacheDAO.insert(from_account, to_account, strMessage);
 				return;
 				
 			}
 			
-			clientTarget = userOnline.get(target.getUser_account()).getClient();
+			clientTarget = userOnline.get(toUser.getUser_account()).getClient();
 			messageResponse.append(attach);
 			messageResponse.append("-");
 			messageResponse.append(from_account);
 			messageResponse.append(":");
 			messageResponse.append(strMessage);
-			System.out.println(messageResponse.toString());
-			sendPacket(clientTarget, messageResponse.toString());
+			poolThread.execute(new SendPacket(clientTarget, messageResponse.toString()));
 		}
 		
 		//组发
@@ -492,18 +513,18 @@ public class Server {
 			int group_id  = 0;
 			if (arrayHead.length > 2) {
 				
-				from_account = arrayHead[1];
+				from_account = arrayHead[0];
 				group_id = Integer.parseInt(arrayHead[2]);
 			}
 			else {
-				sendPacket(client, "groupErr:Protocol Wrong");
+				poolThread.execute(new SendPacket(client, "group:Protocol Wrong"));
 				return;
 			}
 			
 			
 			List<User> groupUsers = groupDAO.searchAllUsersByGroup(group_id, from_account);
 			if (groupUsers == null || groupUsers.isEmpty()) {
-				sendPacket(client, "groupErr:Wrong Account Or GroupId");
+				poolThread.execute(new SendPacket(client, "group:Wrong Account Or GroupId"));
 				return;
 			}
 			for (User user : groupUsers) {
@@ -512,116 +533,89 @@ public class Server {
 			}			
 		}
 		
-		private void sendPacket(SocketChannel client, String strResponse) throws IOException {
-			
-			byte[] byteResponse = strResponse.getBytes("UTF-8");
-			int lengthResponse = byteResponse.length;
-			ByteBuffer buffer = ByteBuffer.allocate(lengthResponse + 4);
-			buffer.putInt(lengthResponse);
-			buffer.put(byteResponse);
-			buffer.flip();
-			while (buffer.hasRemaining()) {
-				
-				client.write(buffer);
-			}
-		}
-		
 		private void modifyUser(String[] arrayHead) throws IOException {
 			
-			String method = arrayHead[1];
-			String user_account = arrayHead[2];
-			
 			if (arrayHead.length > 7) {
-				
-				User user = userOnline.get(user_account);
-				if (user != null && user.getClient().equals(client)) {
+				if ("update".equals(arrayHead[2])) {
 					
-					if ("update".equals(method)) {
+					User user = new User();
+					user.setUser_account(arrayHead[0]);
+					user.setUser_name(arrayHead[3]);
+					user.setUser_passwd(arrayHead[4]);
+					user.setUser_tel(arrayHead[5]);
+					user.setUser_email(arrayHead[6]);
+					user.setUser_icon(arrayHead[7]);
+					if (userDAO.update(user)) {
 						
-						user.setUser_account(user_account);
-						user.setUser_name(arrayHead[3]);
-						user.setUser_passwd(arrayHead[4]);
-						user.setUser_tel(arrayHead[5]);
-						user.setUser_email(arrayHead[6]);
-						user.setUser_icon(arrayHead[7]);
-						if (userDAO.update(user)) {
-							
-							sendPacket(client, "modifyUser-update:succeed");
-							return;
-						}
-						else {
-							
-							sendPacket(client, "modifyUser-update:failed");
-							return;
-						}
-					}	
+						poolThread.execute(new SendPacket(client, "modifyuser-update:succeed"));
+						return;
+					}
+					else {
+						
+						poolThread.execute(new SendPacket(client, "modifyuser-update:failed"));
+						return;
+					}
 				}
 			}
-			sendPacket(client, "modifyUser-update:Protocol Wrong");
+			poolThread.execute(new SendPacket(client, "modifyuser-update:Protocol Wrong"));
 		}
 		
 		private void modifyFriend(String[] arrayHead) throws IOException {
 			
 			String strResponse = "modifyfriend";
-			String method = null;
+			String method = arrayHead[2];
 			Friend friend = new Friend(); 
+			
+			if ("deleteall".equals(method)){
+				
+				if (friendDAO.deleteAllFriends(arrayHead[0])) {
+					strResponse += "-Delete all friend succeed";
+				}
+				else {
+					strResponse += "-Delete all friend failed";
+				}
+				poolThread.execute(new SendPacket(client, strResponse));
+				return;
+			}
 			if (arrayHead.length > 4) {
 				
-  				method = arrayHead[1];
-				friend.setUser_account(arrayHead[2]);
+				friend.setUser_account(arrayHead[0]);
 				friend.setFriend_account(arrayHead[3]);
 				friend.setFriend_remark(arrayHead[4]);
 			} else {
-				sendPacket(client, "modifyfriend:Protocol Wrong");
+				
+				poolThread.execute(new SendPacket(client, "modifyfriend:Protocol Wrong"));
 				return;
 			}
 			
-			User user = userOnline.get(friend.getUser_account());
-			
-			if (user != null && user.getClient().equals(client)) {
+			if ("add".equals(method)) {
 				
-				if ("add".equals(method)) {
-					
-					if (friendDAO.addFriend(friend)) {
-						strResponse += ("-Add friend " + friend.getFriend_account() + " succeed");	
-					}
-					else {
-						strResponse += ("-Add friend " + friend.getFriend_account() + " failed");
-					}
+				if (friendDAO.addFriend(friend)) {
+					strResponse += ("-Add friend " + friend.getFriend_account() + " succeed");	
 				}
-				else if ("update".equals(method)) {
-					
-					if (friendDAO.updateFriend(friend)) {
-						strResponse += ("-Update friend " + friend.getFriend_account() + " succeed");
-					}
-					else {
-						strResponse += ("-Update friend " + friend.getFriend_account() + " failed");
-					}
-				}
-				else if ("delete".equals(method)){
-					
-					if (friendDAO.deleteFriendByAccount(friend.getUser_account(), friend.getFriend_account())) {
-						strResponse += ("-Delete friend " + friend.getFriend_account() + " succeed");
-					}
-					else {
-						strResponse += ("-Delete friend " + friend.getFriend_account() + " failed");
-					}
-				}
-				else if ("deleteall".equals(method)){
-					
-					if (friendDAO.deleteAllFriends(user.getUser_account())) {
-						strResponse += ("-Delete all friend " + friend.getFriend_account() + " succeed");
-					}
-					else {
-						strResponse += ("-Delete all friend " + friend.getFriend_account() + " failed");
-					}
+				else {
+					strResponse += ("-Add friend " + friend.getFriend_account() + " failed");
 				}
 			}
-			else {
-				strResponse += ":Wrong Account";
+			else if ("update".equals(method)) {
+				
+				if (friendDAO.updateFriend(friend)) {
+					strResponse += ("-Update friend " + friend.getFriend_account() + " succeed");
+				}
+				else {
+					strResponse += ("-Update friend " + friend.getFriend_account() + " failed");
+				}
 			}
-			System.out.println(strResponse);
-			sendPacket(client, strResponse);
+			else if ("delete".equals(method)){
+				
+				if (friendDAO.deleteFriendByAccount(friend.getUser_account(), friend.getFriend_account())) {
+					strResponse += ("-Delete friend " + friend.getFriend_account() + " succeed");
+				}
+				else {
+					strResponse += ("-Delete friend " + friend.getFriend_account() + " failed");
+				}
+			}
+			poolThread.execute(new SendPacket(client, strResponse));
 		}
 		
 		private void modifyGroup(String[] arrayHead) throws IOException {
@@ -631,23 +625,17 @@ public class Server {
 			Group group = new Group();
 			if (arrayHead.length > 4) {
 				
-				method = arrayHead[1];
-				group.setUser_account(arrayHead[2]);
+				method = arrayHead[2];
+				group.setUser_account(arrayHead[0]);
 				group.setGroup_id(Integer.parseInt(arrayHead[3]));
 				group.setGroup_name(arrayHead[4]);
 			}
 			else {
 				
-				sendPacket(client, "modifygroup: Wrong Protocol");
+				poolThread.execute(new SendPacket(client, "modifygroup: Wrong Protocol"));
 				return;
 			}
 			
-			User user = userOnline.get(group.getUser_account());
-			if (user == null || !client.equals(user.getClient())) {
-				
-				sendPacket(client, "modifygroup: Wrong Account");
-				return;
-			}
 			if ("add".equals(method)) {
 				
 				if (groupDAO.createGroup(group)) {
@@ -675,28 +663,41 @@ public class Server {
 					strResponse += "-delete:failed";
 				}
 			}
-			sendPacket(client, strResponse);
+			poolThread.execute(new SendPacket(client, strResponse));
 		}
 		
 	}
 	
 	
-	class Writer implements Runnable {
+	class SendPacket implements Runnable {
 		
 		private SocketChannel client;
+		private String strResponse;
 		
-		public Writer(SocketChannel client) {
+		public SendPacket(SocketChannel client, String strResponse) {
 			this.client = client;
-			
+			this.strResponse = strResponse;
 		}
 		
 		@Override
 		public void run() {
 			
-			
-		}	
-			
-		
+			byte[] byteResponse;
+			try {
+				byteResponse = strResponse.getBytes("UTF-8");
+				int lengthResponse = byteResponse.length;
+				ByteBuffer buffer = ByteBuffer.allocate(lengthResponse + 4);
+				buffer.putInt(lengthResponse);
+				buffer.put(byteResponse);
+				buffer.flip();
+				while (buffer.hasRemaining()) {
+					
+					client.write(buffer);
+				}
+			} catch (IOException e) {
+				System.err.println(e);
+			}
+		}		
 	}
 	
 	public static void main(String[] args){

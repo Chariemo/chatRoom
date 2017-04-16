@@ -172,7 +172,7 @@ public class Client {
 		String protocol = message.split(":")[0];
 		String content = message.split(":")[1];
 		if (("signin").equals(protocol)) {
-			if (("ok").equals(content)) {
+			if (("secceed").equals(content)) {
 				isSignIn = true;
 				System.out.println("Already connect to server");
 				signInView.dispose();

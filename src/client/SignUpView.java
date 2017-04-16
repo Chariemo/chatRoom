@@ -155,7 +155,7 @@ public class SignUpView extends javax.swing.JFrame {
 		if (passwd.equals("") || name.equals(""))
 			JOptionPane.showMessageDialog(this, "密码、昵称不能为空！");
 		else {
-			String signUpMessage = "signup-" + name + "-" + passwd;
+			String signUpMessage = " " + "-signup-" + name + "-" + passwd;
 
 			if (tel.equals(""))
 				signUpMessage += "- " + tel;
