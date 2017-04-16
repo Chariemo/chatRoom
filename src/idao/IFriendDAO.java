@@ -16,7 +16,7 @@ public interface IFriendDAO {
 	
 	public boolean updateFriend(Friend friend);
 	
-	public HashMap<String, User> searchAllFriend(String user_account);
+	public HashMap<User, String> searchAllFriend(String user_account);
 	
 	public User searchFriendByAccount(String user_account, String friend_account);
 	

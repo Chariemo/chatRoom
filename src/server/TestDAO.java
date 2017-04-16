@@ -6,6 +6,7 @@ import java.util.regex.Pattern;
 
 import com.sun.org.apache.bcel.internal.generic.NEW;
 
+import dao.KeyIncrementer;
 import dao.MessageCacheDAO;
 import dao.UserDAO;
 import idao.DAOFactory;
@@ -17,17 +18,15 @@ public class TestDAO {
 	
 	public static void main(String[] args) {
 		
-		/*User user = new User();
-		user.setUser_account("654321");
-		user.setUser_icon("/src");
+		User user = new User();
 		user.setUser_name("abc");
-		user.setUser_passwd("111111");
+		user.setUser_passwd("123456");
 		
 		UserDAO userDAO = (UserDAO) DAOFactory.createUserDAO();
 		userDAO.insert(user);
-		System.out.println(userDAO.verify("123456", "111111"));
-		List<User> users = userDAO.searchUserByName("charley");
-		System.out.println(users.get(0));*/
+		System.out.println(userDAO.verify("000001", "123456"));
+		List<User> users = userDAO.searchUserByName("abc");
+		System.out.println(users.get(0));
 		
 		 
 		/*Friend friend = new Friend();
@@ -45,7 +44,9 @@ public class TestDAO {
 //		messageCacheDAO.insert("123456", "654321", "nishishabi");
 //		System.out.println(messageCacheDAO.searchMessageCache("654321").get(0).toString());
 		
-		String start = "000001";
-		System.out.println(Integer.toString((Integer.parseInt(start) + 1)));
+//		String start = "000001";
+//		System.out.println(Integer.toString((Integer.parseInt(start) + 1)));
+		
+//		System.out.println(new KeyIncrementer().nextKey("300005"));
 	}
 }

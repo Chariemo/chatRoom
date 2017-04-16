@@ -9,9 +9,18 @@ public class MessageCache {
 	private String message_date;
 	private String content;
 	private boolean message_status;
+	private String message_type;
 	
 	public MessageCache() {
 		
+	}
+	
+	public String getMessage_type() {
+		return message_type;
+	}
+
+	public void setMessage_type(String message_type) {
+		this.message_type = message_type;
 	}
 	
 	public boolean isMessage_status() {

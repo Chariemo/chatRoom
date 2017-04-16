@@ -66,15 +66,22 @@ public class Server {
 		userOnline.put(user_account, user);
 	}
 	
-	public void delUserOnline(SocketChannel socketChannel) {
+	public User delandGetUserOnline(SocketChannel socketChannel) {
 		
-		Set<String> keys = userOnline.keySet();
-		for (String key : keys) {
+		Iterator<Entry<String, User>> iterator = userOnline.entrySet().iterator();
+		Entry<String, User> entry;
+		User user = null;
+		
+		while (iterator.hasNext()) {
 			
-			if (userOnline.get(key).getClient().equals(socketChannel)) {
-				userOnline.remove(key);
+			entry = iterator.next();
+			if (entry.getValue().getClient().equals(socketChannel)) {
+				
+				user = entry.getValue();
+				iterator.remove();
 			}
 		}
+		return user;
 	}
 	
 	public void handleConnection() {
@@ -99,7 +106,7 @@ public class Server {
 					if (key.isAcceptable()) {
 						
 						SocketChannel client = server.accept();		
-						System.out.println("User " + client.getRemoteAddress()+ " has connected the server");
+						System.out.println("Client " + client.getRemoteAddress()+ " has connected the server");
 						client.configureBlocking(false);
 						SelectionKey keyClient = client.register(selector, SelectionKey.OP_READ);
 						Boolean finished = true;
@@ -127,7 +134,6 @@ public class Server {
 
 		private SocketChannel client;
 		private SelectionKey key;
-		User self = null;
 		
 		public MessageHandler(SelectionKey key) {
 			
@@ -147,9 +153,9 @@ public class Server {
 				key.attach(finished);
 			} catch (IOException e) {
 				
-				friendsStatus(self, "logout");
-				delUserOnline(client);
-				System.err.println("User " + self.getUser_name() + " disconnected");
+				User user = delandGetUserOnline(client);
+				friendsStatus(user, "logout");
+				System.err.println("User " + user + " disconnected");
 			} finally {		
 				
 				Thread.currentThread().interrupt();
@@ -327,6 +333,7 @@ public class Server {
 			String user_account = null;
 			String user_passwd = null;
 			boolean verification = false;
+			User self = null;
 			if (arrayHead.length > 2) {
 				
 				user_account = arrayHead[0];
@@ -373,26 +380,63 @@ public class Server {
 		//传送朋友列表及上线提醒
 		private void friendsStatus(User meUser, String attach) {
 			
-			StringBuilder strResponse = new StringBuilder("friends:");
-			HashMap<String, User> friends = friendDAO.searchAllFriend(meUser.getUser_account());
+			StringBuilder strResponse = new StringBuilder();
+			strResponse.append("friends:");
+			HashMap<User, String> friends = new HashMap<>();
+			if (meUser != null) {
+				friends = friendDAO.searchAllFriend(meUser.getUser_account());
+			}
 			User friend = null;
 			User friendOnline = null;
 			SocketChannel friendClient = null;
 			
 			if (!friends.isEmpty()) {
 				
-				Iterator<Entry<String, User>> friendIterator = friends.entrySet().iterator();
+				Iterator<Entry<User, String>> friendIterator = friends.entrySet().iterator();
 				while (friendIterator.hasNext()) {
 					
-					friend = friendIterator.next().getValue();
+					Entry<User, String> entry = friendIterator.next();
+					friend = entry.getKey();
 					strResponse.append(friend.getUser_account());
 					strResponse.append("-");
-					//TODO
-					if ((friendOnline = userOnline.get(friendIterator.next().getKey())) != null) {
+					strResponse.append(friend.getUser_name());
+					strResponse.append("-");
+					if (entry.getValue() == null) {
+						strResponse.append(" -");
+					}
+					else {
+						strResponse.append(entry.getValue());
+						strResponse.append("-");
+					}
+					//tel = null
+					if (friend.getUser_tel() == null) {
+						strResponse.append(" -");
+					}
+					else {
+						strResponse.append(friend.getUser_tel());
+						strResponse.append("-");
+					}
+					//email = null
+					if (friend.getUser_email() == null) {
+						strResponse.append(" -");
+					}
+					else {
+						strResponse.append(friend.getUser_email());
+						strResponse.append("-");
+					}
+					//icon = null
+					if (friend.getUser_icon() == null) {
+						strResponse.append(" -");
+					}
+					else {
+						strResponse.append(friend.getUser_icon());
+						strResponse.append("-");
+					}
+					if ((friendOnline = userOnline.get(friend.getUser_account())) != null) {
 						strResponse.append("online"); //在线
 						
 						friendClient = friendOnline.getClient();
-						poolThread.execute(new SendPacket(friendClient, attach + "-" + friendOnline.getUser_account()));
+						poolThread.execute(new SendPacket(friendClient, attach + "-" + meUser.getUser_account()));
 					}
 					else {
 						strResponse.append("notonline"); //不在线
@@ -409,7 +453,8 @@ public class Server {
 		private void handleMessageCache(User user) throws IOException {
 			
 			List<MessageCache> messageList = messageCacheDAO.searchMessageCache(user.getUser_account());
-			StringBuilder data = new StringBuilder("person-");
+			StringBuilder data = new StringBuilder();
+			data.append("person-");
 			if (!messageList.isEmpty()) {
 				
 				for (MessageCache messageCache : messageList) {
@@ -428,7 +473,6 @@ public class Server {
 			
 			System.out.println("SignUp...");
 			User newUser = new User();
-			System.out.println("length: " + arrayHead.length);
 			if (arrayHead.length > 6) {
 				newUser.setUser_name(arrayHead[2]);
 				newUser.setUser_passwd(arrayHead[3]);
@@ -463,11 +507,12 @@ public class Server {
 			
 			String strResponse = "signoff:";
 			
-			if (userDAO.delete(self.getUser_account()))	{
+			if (userDAO.delete(arrrayHead[0]))	{
 				
-				delUserOnline(client);
+				delandGetUserOnline(client);
 				strResponse += "succeed";
 				poolThread.execute(new SendPacket(client, strResponse));
+				key.cancel();
 				client.close();
 			}
 			else {
@@ -684,6 +729,7 @@ public class Server {
 			
 			byte[] byteResponse;
 			try {
+				System.out.println("response " + strResponse);
 				byteResponse = strResponse.getBytes("UTF-8");
 				int lengthResponse = byteResponse.length;
 				ByteBuffer buffer = ByteBuffer.allocate(lengthResponse + 4);

@@ -6,7 +6,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.regex.Pattern;
 
 import idao.IUserDAO;
@@ -24,18 +23,6 @@ public class UserDAO implements IUserDAO {
 			return result;
 		}
 		
-		String random_account = null;
-		Random random = new Random();
-		
-		while (true) {
-			
-			random_account = Integer.toString(100000 + random.nextInt(499999));
-			if (!isExistAccount(random_account)) {
-				break;
-			}
-		}
-		System.out.println("random_account: " + random_account); 
-		user.setUser_account(random_account);
 		if (" ".equals(user.getUser_email())) {
 			user.setUser_email(null);
 		}
@@ -45,59 +32,54 @@ public class UserDAO implements IUserDAO {
 		
 		Connection connection = ConnectionManager.getInstance().getConnection();
 		PreparedStatement pStatement = null;
+		ResultSet resultSet = null;
+		String currentKey = null;
+		String user_account = null;
 		
-		String sql = "INSERT INTO cruser(user_account, user_name, user_passwd, user_icon, user_email,"
-				+ "user_tel) VALUES("
-				+ "?, ?, ?, ?, ?, ?)";
 		try {
+			connection.setAutoCommit(false);
 			
+			String sqlIncre = "SELECT increkey FROM keyincrement WHERE crtable = 'cruser'";
+			pStatement = connection.prepareStatement(sqlIncre);
+			resultSet = pStatement.executeQuery();
+			if (resultSet.next()) {
+				currentKey = resultSet.getString("increkey");
+			}
+			pStatement.close();
+			
+			user_account = new KeyIncrementer().nextKey(currentKey);
+			
+			String sql = "INSERT INTO cruser(user_account, user_name, user_passwd, user_icon, user_email,"
+					+ "user_tel) VALUES("
+					+ "?, ?, ?, ?, ?, ?)";
 			pStatement =  connection.prepareStatement(sql);
-			pStatement.setString(1, user.getUser_account());
+			pStatement.setString(1, user_account);
 			pStatement.setString(2, user.getUser_name());
 			pStatement.setString(3, user.getUser_passwd());
 			pStatement.setString(4, user.getUser_icon());
 			pStatement.setString(5, user.getUser_email());
 			pStatement.setString(6, user.getUser_tel());
 			
-			
 			pStatement.executeUpdate();
-			result = random_account;
+			pStatement.close();
+			
+			String updataSql = "UPDATE keyincrement SET increkey = ? WHERE crtable = 'cruser'";
+			pStatement = connection.prepareStatement(updataSql);
+			pStatement.setString(1, user_account);
+			pStatement.executeUpdate();
+			
+			connection.commit();
+			result = user_account;
 		} catch (SQLException e) {
-			System.err.println(e);
+			e.printStackTrace();
 		} finally {
 			
-			ConnectionManager.close(null, pStatement, connection);
+			ConnectionManager.close(resultSet, pStatement, connection);
 			return result;
 		}
 		
 	}
 	
-	@SuppressWarnings("finally")
-	private boolean isExistAccount(String random_account) {
-		
-		boolean result = true;
-		
-		Connection connection = ConnectionManager.getInstance().getConnection();
-		PreparedStatement pStatement = null;
-		
-		String sql = "SELECT user_id FROM cruser WHERE user_account = ?";
-		
-		try {
-			pStatement = connection.prepareStatement(sql);
-			pStatement.setString(1, random_account);
-			
-			if (!pStatement.executeQuery().next()) {
-				result = false;
-			}
-		} catch (SQLException e) {
-			System.err.println(e);
-		} finally {
-			
-			ConnectionManager.close(null, pStatement, connection);
-			return result;
-		}
-	}
-
 	@SuppressWarnings({ "finally" })
 	@Override
 	public boolean delete(String user_account) {

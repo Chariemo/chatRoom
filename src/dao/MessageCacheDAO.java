@@ -27,8 +27,8 @@ public class MessageCacheDAO implements IMessageCacheDAO{
 		Connection connection = ConnectionManager.getInstance().getConnection();
 		PreparedStatement pStatement = null;
 		
-		String sql = "INSERT INTO messagecache (from_account, to_account, message_date, content, message_status)"
-				+ "VALUES (?, ?, now(), ?, ?)";
+		String sql = "INSERT INTO messagecache (from_account, to_account, message_date, content, message_status, message_type)"
+				+ "VALUES (?, ?, now(), ?, ?, 'message')";
 		
 		try {
 			pStatement = connection.prepareStatement(sql);
@@ -87,11 +87,6 @@ public class MessageCacheDAO implements IMessageCacheDAO{
 			ConnectionManager.close(resultSet, pStatement, connection);
 			return result;
 		}
-	}
-	
-	private void readMessageCache(String user_account) {
-		
-		
 	}
 
 }

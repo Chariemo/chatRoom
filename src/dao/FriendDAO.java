@@ -21,7 +21,7 @@ public class FriendDAO implements IFriendDAO{
 	public boolean addFriend(Friend friend) {
 		
 		boolean result = false;	
-		if (friend == null) {
+		if (friend == null || friend.getUser_account().equals(friend.getFriend_account())) {
 			return result;
 		}
 		
@@ -36,14 +36,23 @@ public class FriendDAO implements IFriendDAO{
 		
 		String sql = "INSERT INTO friends(user_account, friend_account, friend_remark) VALUES("
 				+ "?, ?, ?)";
-		
 		try {
+			connection.setAutoCommit(false);
 			pStatement = connection.prepareStatement(sql);
 			pStatement.setString(1, friend.getUser_account());
 			pStatement.setString(2, friend.getFriend_account());
 			pStatement.setString(3, friend.getFriend_remark());
 			
 			pStatement.executeUpdate();
+			pStatement.close();
+			
+			pStatement = connection.prepareStatement(sql);
+			pStatement.setString(1, friend.getFriend_account());
+			pStatement.setString(2, friend.getUser_account());
+			pStatement.setString(3, null);
+			pStatement.executeUpdate();
+			
+			connection.commit();
 			result = true;
 		} catch (SQLException e) {
 			System.err.println(e);
@@ -69,11 +78,22 @@ public class FriendDAO implements IFriendDAO{
 		String sql = "DELETE FROM friends WHERE user_account = ? AND friend_account = ?";
 		
 		try {
+			
+			connection.setAutoCommit(false);
 			pStatement = connection.prepareStatement(sql);
 			pStatement.setString(1, user_account);
 			pStatement.setString(2, friend_account);
 			
 			pStatement.executeUpdate();
+			pStatement.close();
+			
+			pStatement = connection.prepareStatement(sql);
+			pStatement.setString(1, friend_account);
+			pStatement.setString(2, user_account);
+			
+			pStatement.executeUpdate();
+			
+			connection.commit();
 			result = true;
 		} catch (SQLException e) {
 			System.err.println(e);
@@ -96,13 +116,23 @@ public class FriendDAO implements IFriendDAO{
 		Connection connection = ConnectionManager.getInstance().getConnection();
 		PreparedStatement pStatement = null;
 		
-		String sql = "DELETE FROM friends WHERE user_account = ?";
+		String sql1 = "DELETE FROM friends WHERE user_account = ?";
 		
+		String sql = "DELETE FROM friends WHERE user_account in (SELECT temp.friend_account FROM "
+				+ "(SELECT friend_account FROM friends WHERE user_account = ?) temp)";
 		try {
+			connection.setAutoCommit(false);
 			pStatement = connection.prepareStatement(sql);
 			pStatement.setString(1, user_account);
 			
 			pStatement.executeUpdate();
+			pStatement.close();
+			
+			pStatement = connection.prepareStatement(sql1);
+			pStatement.setString(1, user_account);
+			
+			pStatement.executeUpdate();
+			connection.commit();
 			result = true;
 			
 		} catch (SQLException e) {
@@ -234,47 +264,51 @@ public class FriendDAO implements IFriendDAO{
 
 	@SuppressWarnings("finally")
 	@Override
-	public HashMap<String, User> searchAllFriend(String user_account) {
-		
-		HashMap<String, User> result = new HashMap<>();
+	public HashMap<User, String> searchAllFriend(String user_account) {
+
+		HashMap<User, String> result = new HashMap<>();
 		if (user_account == null) {
 			return result;
 		}
-		
+
 		Connection connection = ConnectionManager.getInstance().getConnection();
 		PreparedStatement pStatement = null;
 		ResultSet resultSet = null;
-		
-		
-		String sql = "SELECT * FROM cruser WHERE user_account in ("
-				+ "SELECT friend_account FROM friends WHERE user_account = ?)";
-		
+		String sql = "SELECT cruser.user_account, user_name, user_tel, user_email, user_icon, friend_remark "
+				+ "FROM cruser, friends "
+				+ "WHERE cruser.user_account IN (SELECT friend_account FROM friends WHERE friends.user_account = ?) "
+				+ "and friends.friend_account = cruser.user_account "
+				+ "and friends.user_account = ?";
 		try {
 			pStatement = connection.prepareStatement(sql);
 			pStatement.setString(1, user_account);
-			
+			pStatement.setString(2, user_account);
+
 			resultSet = pStatement.executeQuery();
 			User user = null;
+			String friendRemark = null;
 			while (resultSet.next()) {
-				
+
 				user = new User();
 				user.setUser_account(resultSet.getString("user_account"));
 				user.setUser_icon(resultSet.getString("user_icon"));
 				user.setUser_name(resultSet.getString("user_name"));
 				user.setUser_tel(resultSet.getString("user_tel"));
 				user.setUser_email(resultSet.getString("user_email"));
-				
-				result.put(user.getUser_account(), user);
-				
+				friendRemark = resultSet.getString("friend_remark");
+
+				result.put(user, friendRemark);
+
 			}
-			
+
 		} catch (SQLException e) {
 			System.err.println(e);
 		} finally {
-			
+
 			ConnectionManager.close(resultSet, pStatement, connection);
 			return result;
 		}
 	}
 
 }
+
