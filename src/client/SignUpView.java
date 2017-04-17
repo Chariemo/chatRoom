@@ -64,7 +64,7 @@ public class SignUpView extends javax.swing.JFrame {
 		jMenu2.setText("Edit");
 		jMenuBar1.add(jMenu2);
 
-		setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+		setDefaultCloseOperation(javax.swing.JFrame.DISPOSE_ON_CLOSE);
 
 		jLabel2.setText("密码：");
 
@@ -152,15 +152,11 @@ public class SignUpView extends javax.swing.JFrame {
 		String email = jTextField4.getText();
 		String icon = jTextField5.getText();
 
-		if (passwd.equals("") || name.equals(""))
-			JOptionPane.showMessageDialog(this, "密码、昵称不能为空！");
+		if (passwd.equals("") || name.equals("") || tel.equals("") || email.equals(""))
+			JOptionPane.showMessageDialog(this, "密码、昵称、手机、邮箱不能为空！");
 		else {
-			String signUpMessage = " " + "-signup-" + name + "-" + passwd;
-
-			if (tel.equals(""))
-				signUpMessage += "- " + tel;
-			if (email.equals(""))
-				signUpMessage += "- " + email;
+			String signUpMessage = " " + "-signup-" + name + "-" + passwd + "-" + tel + "-" + email;
+			
 			if (icon.equals(""))
 				signUpMessage += "- " + icon;
 
@@ -170,12 +166,13 @@ public class SignUpView extends javax.swing.JFrame {
 			buffer.flip();
 			System.out.println(charset.decode(buffer));
 			buffer.flip();
-			while (buffer.hasRemaining())
+			while (buffer.hasRemaining()){
 				try {
 					socketChannel.write(buffer);
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
+			}
 			buffer.clear();
 		}
 	}

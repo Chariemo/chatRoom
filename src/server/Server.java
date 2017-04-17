@@ -86,8 +86,9 @@ public class Server {
 		return user;
 	}
 	
-	public void handleConnection() {
+	public void handleConnection() throws IOException {
 		
+		System.out.println("Server has started");
 		while (true) {
 			
 			try {
@@ -286,25 +287,29 @@ public class Server {
 				protocol = arrayHead[1];
 				account = arrayHead[0];
 			}
-			if ("signin".equals(protocol)) {
+						
+			if ("signin".equals(protocol)) { //account-signoff-passwd
 				
 				signIn(arrayHead);
+				return;
 			}
-			else if ("signup".equals(protocol)) {
+			else if ("signup".equals(protocol)) { //" "-signup-passwd-...
 				
 				signUp(arrayHead);
+				return;
 			}
 			
 			User user = userOnline.get(account);
 			if (user == null || !client.equals(user.getClient())) {
-				poolThread.execute(new SendPacket(client, "Wrong Account"));
+				poolThread.execute(new SendPacket(client, "tip:Wrong Account"));
 				return;
 			}
-			if ("signoff".equals(protocol)) {
+
+			if ("signoff".equals(protocol)) { //account-signoff
 				
 				signOff(arrayHead);
 			}
-			else if ("person".equals(protocol)) {
+			else if ("person".equals(protocol)) { //account-person-to_account:message
 				
 				if (arrayHead.length > 2) {
 					
@@ -316,21 +321,25 @@ public class Server {
 					singleForward(messageCache, "person");
 				}
 			}
-			else if ("group".equals(protocol)) {
+			else if ("group".equals(protocol)) { //account-group-to_groupId:message
 				
 				groupForward(strMessage, arrayHead);
 			}
-			else if ("modifyuser".equals(protocol)) {
+			else if ("modifyuser".equals(protocol)) { //account-modifyuser-update-passwd...
 				
 				modifyUser(arrayHead);
 			}
-			else if ("modifyfriend".equals(protocol)) {
+			else if ("modifyfriend".equals(protocol)) { //account-modifyfriend-add/update/..-friend_account-..
 				
 				modifyFriend(arrayHead);
 			}
-			else if ("modifygroup".equals(protocol)) {
+			else if ("modifygroup".equals(protocol)) { //account-modifygroup-add/update/..-groupId-gname
 				
 				modifyGroup(arrayHead);
+			}
+			else if ("searchperson".equals(protocol)) { //account-searchperson-search_account
+				
+				searchPerson(arrayHead);
 			}
 			
 		}
@@ -359,7 +368,7 @@ public class Server {
 					verification = userDAO.verify(user_account, user_passwd);
 					if (verification) {
 						
-						System.out.println("Pass\nUser " + self + "has signed In");
+						System.out.println("Pass\nUser " + self + " has signed In");
 						strResponse = user_account + "-signin:succeed";
 						self.setClient(client);
 						addUserOnline(self.getUser_account(), self);
@@ -380,8 +389,8 @@ public class Server {
 			//用户登录后处理
 			if (verification) {
 				
-				handleMessageCache(self);
 				friendsStatus(self, "login");
+				handleMessageCache(self);
 			}
 		}
 		
@@ -395,9 +404,43 @@ public class Server {
 			if (meUser != null) {
 				friends = friendDAO.searchAllFriend(meUser.getUser_account());
 			}
+			else {
+				return;
+			}
 			User friend = null;
 			User friendOnline = null;
 			SocketChannel friendClient = null;
+			strResponse.append(meUser.getUser_account());
+			strResponse.append("-");
+			strResponse.append(meUser.getUser_name());
+			strResponse.append("-");
+			strResponse.append(meUser.getUser_passwd());
+			strResponse.append("-");
+			//tel = null
+			if (meUser.getUser_tel() == null) {
+				strResponse.append(" -");
+			}
+			else {
+				strResponse.append(meUser.getUser_tel());
+				strResponse.append("-");
+			}
+			//email = null
+			if (meUser.getUser_email() == null) {
+				strResponse.append(" -");
+			}
+			else {
+				strResponse.append(meUser.getUser_email());
+				strResponse.append("-");
+			}
+			//icon = null
+			if (meUser.getUser_icon() == null) {
+				strResponse.append(" -online");
+			}
+			else {
+				strResponse.append(meUser.getUser_icon());
+				strResponse.append("-online");
+			}
+			strResponse.append(":");
 			
 			if (!friends.isEmpty()) {
 				
@@ -461,33 +504,25 @@ public class Server {
 		//获取并转发离线信息
 		private void handleMessageCache(User user) throws IOException {
 			
-			List<MessageCache> messageList = messageCacheDAO.searchMessageCache(user.getUser_account(), 1);
+			List<MessageCache> messageList = messageCacheDAO.searchMessageCache(user.getUser_account());
 			StringBuilder data = new StringBuilder();
 			data.append("person-");
 			if (!messageList.isEmpty()) {
 				
 				for (MessageCache messageCache : messageList) {
 					
-					data.append(messageCache.getFrom_account());
-					data.append(":");
-					data.append(messageCache.getContent());
-					poolThread.execute(new SendPacket(client, data.toString()));
+					if (messageCache.getMessage_type() == 1) {
+						singleForward(messageCache, "person");
+					}
+					else if (messageCache.getMessage_type() == -1) {
+						
+					}
+					else {
+						singleForward(messageCache, "verification");
+					}
 				}
 			}
 			
-			List<MessageCache> friendVerification = messageCacheDAO.searchMessageCache(user.getUser_account(), 0);
-			data.delete(0, data.length());
-			data.append("person-");
-			if (!friendVerification.isEmpty()) {
-				
-				for (MessageCache friendV : friendVerification) {
-					
-					data.append(friendV.getFrom_account());
-					data.append(":");
-					data.append(friendV.getContent());
-					poolThread.execute(new SendPacket(client, data.toString()));
-				}
-			}
 			//TODO 进群验证 好友验证
 			
 		}
@@ -572,6 +607,11 @@ public class Server {
 			messageResponse.append(messageCache.getFrom_account());
 			messageResponse.append(":");
 			messageResponse.append(messageCache.getContent());
+			
+			if (messageCache.getMessage_type() != 1) {
+				messageResponse.append(":");
+				messageResponse.append(messageCache.getMessage_type());
+			}
 			poolThread.execute(new SendPacket(clientTarget, messageResponse.toString()));
 		}
 		
@@ -666,12 +706,38 @@ public class Server {
 			
 			if ("add".equals(method)) {
 				
-				messageCache = new MessageCache();
-				messageCache.setFrom_account(friend.getUser_account());
-				messageCache.setTo_account(friend.getFriend_account());
-				messageCache.setContent(userOnline.get(friend.getUser_account()).getUser_name() + " want to add you as a friend");
-				messageCache.setMessage_type(0);
-				singleForward(messageCache, "person");
+				String status = arrayHead[5];
+				System.out.println("modifyfriend:fff " + status);
+				if ("ask".equals(status) && !friend.getUser_account().equals(friend.getFriend_account())) {
+					messageCache = new MessageCache();
+					messageCache.setFrom_account(friend.getUser_account());
+					messageCache.setTo_account(friend.getFriend_account());
+					messageCache.setContent(userOnline.get(friend.getUser_account()) + " want to add you as a friend");
+					messageCache.setMessage_type(0);
+					singleForward(messageCache, "verification");
+					return;
+				}
+				else if ("succeed".equals(status)) {
+					if (friendDAO.addFriend(friend)) {
+						return;
+					}
+					else {
+						strResponse += "-add:failed";
+					}
+				}
+				else if ("failed".equals(status)) {
+					
+					
+					messageCache = new MessageCache();
+					messageCache.setFrom_account(friend.getUser_account());
+					messageCache.setTo_account(friend.getFriend_account());
+					messageCache.setContent(userOnline.get(friend.getUser_account()) + " don't not agree"
+							+ " add you as a friend");
+					messageCache.setMessage_type(22);
+					singleForward(messageCache, "verification");
+					return;
+				}
+				
 				/*if (friendDAO.addFriend(friend)) {
 					strResponse += ("-Add friend " + friend.getFriend_account() + " succeed");	
 				}
@@ -682,19 +748,19 @@ public class Server {
 			else if ("update".equals(method)) {
 				
 				if (friendDAO.updateFriend(friend)) {
-					strResponse += ("-Update friend " + friend.getFriend_account() + " succeed");
+					strResponse += ("-update " + friend.getFriend_remark() + " " + friend.getFriend_account() + " succeed");
 				}
 				else {
-					strResponse += ("-Update friend " + friend.getFriend_account() + " failed");
+					strResponse += ("-update " + friend.getFriend_remark() + " " + friend.getFriend_account() + " failed");
 				}
 			}
 			else if ("delete".equals(method)){
 				
 				if (friendDAO.deleteFriendByAccount(friend.getUser_account(), friend.getFriend_account())) {
-					strResponse += ("-Delete friend " + friend.getFriend_account() + " succeed");
+					strResponse += ("-delete friend " + friend.getFriend_account() + " succeed");
 				}
 				else {
-					strResponse += ("-Delete friend " + friend.getFriend_account() + " failed");
+					strResponse += ("-delete friend " + friend.getFriend_account() + " failed");
 				}
 			}
 			poolThread.execute(new SendPacket(client, strResponse));
@@ -748,6 +814,28 @@ public class Server {
 			poolThread.execute(new SendPacket(client, strResponse));
 		}
 		
+		private void searchPerson(String[] arrayHead) {
+			
+			User searchUser = null;
+			StringBuilder strResponse = new StringBuilder();
+			strResponse.append("searchperson:");
+			if (arrayHead.length > 2) {
+				
+				searchUser = userDAO.searchUserByCondition(arrayHead[2]);
+				if (searchUser == null) {
+					strResponse.append("There is no this guy");
+				}
+				else {
+					strResponse.append(searchUser.getUser_account());
+					strResponse.append("-");
+					strResponse.append(searchUser.getUser_name());
+					strResponse.append("-");
+					strResponse.append(searchUser.getUser_email());
+				}
+				poolThread.execute(new SendPacket(client, strResponse.toString()));
+			}
+		}
+		
 	}
 	
 	
@@ -766,7 +854,7 @@ public class Server {
 			
 			byte[] byteResponse;
 			try {
-				System.out.println("response " + strResponse);
+				System.out.println(strResponse);
 				byteResponse = strResponse.getBytes("UTF-8");
 				int lengthResponse = byteResponse.length;
 				ByteBuffer buffer = ByteBuffer.allocate(lengthResponse + 4);

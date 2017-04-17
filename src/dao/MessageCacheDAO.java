@@ -49,7 +49,7 @@ public class MessageCacheDAO implements IMessageCacheDAO{
 
 	@SuppressWarnings("finally")
 	@Override
-	public List<MessageCache> searchMessageCache(String to_account, int message_type) {
+	public List<MessageCache> searchMessageCache(String to_account) {
 
 		List<MessageCache> result = new ArrayList<>();
 		if (to_account == null) {
@@ -61,12 +61,11 @@ public class MessageCacheDAO implements IMessageCacheDAO{
 		MessageCache message = null;
 		ResultSet resultSet = null;
 		
-		String sql = "CALL messageCacheHandle(?, ?)";
+		String sql = "CALL messageCacheHandle(?)";
 		
 		try {
 			pStatement = connection.prepareStatement(sql);
 			pStatement.setString(1, to_account);
-			pStatement.setInt(2, message_type);
 			
 			resultSet = pStatement.executeQuery();
 			while (resultSet.next()) {

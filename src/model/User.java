@@ -12,12 +12,23 @@ public class User {
 	private String user_tel;
 	private String user_email;
 	private SocketChannel client;
+	private String isOnline;
+	
+	
 
 	public User() {
 		
 	}
 	
-	
+	public String getIsOnline() {
+		return isOnline;
+	}
+
+
+	public void setIsOnline(String isOnline) {
+		this.isOnline = isOnline;
+	}
+
 	public SocketChannel getClient() {
 		return client;
 	}

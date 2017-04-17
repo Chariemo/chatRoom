@@ -1,11 +1,14 @@
 package client;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 
 import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -59,15 +62,18 @@ public class SignInView extends javax.swing.JFrame {
 		jMenuBar1.add(jMenu2);
 
 		setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+		this.getRootPane().setDefaultButton(jButton1);
 
 		jLabel1.setText("账号：");
 
 		jLabel2.setText("密码：");
 
 		jButton1.setText("登陆");
-		jButton1.addMouseListener(new java.awt.event.MouseAdapter() {
-			public void mouseReleased(java.awt.event.MouseEvent evt) {
-				jButton1MouseReleased(evt);
+		jButton1.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				signInListener(e);
 			}
 		});
 
@@ -152,35 +158,41 @@ public class SignInView extends javax.swing.JFrame {
 
 		pack();
 	}// </editor-fold>
-
-	private void jButton1MouseReleased(java.awt.event.MouseEvent evt) {
-		System.out.println("signin: ");
+	
+	//登陆
+	private void signInListener(ActionEvent e) {
 		String account = jTextField1.getText();
 		String passwd = jTextField2.getText();
 		String signInMessage = account + "-signin-" + passwd;
-		System.out.println("account: " + account + "passwd: " + passwd);
 		if (("").equals(account) || ("").equals(passwd))
 			JOptionPane.showMessageDialog(this, "请输入账号和密码！");
-		int signInLength = account.getBytes(charset).length + passwd.getBytes(charset).length + 8;
-		buffer.putInt(signInLength);
-		buffer.put(charset.encode(signInMessage).array(), 0, signInLength);
-		buffer.flip();
-		System.out.println(charset.decode(buffer));
-		buffer.flip();
-		while (buffer.hasRemaining())
-			try {
-				socketChannel.write(buffer);
-			} catch (IOException e) {
-				e.printStackTrace();
+		else{
+			int signInLength = account.getBytes(charset).length + passwd.getBytes(charset).length + 8;
+			buffer.putInt(signInLength);
+			buffer.put(charset.encode(signInMessage).array(), 0, signInLength);
+	//		buffer.flip();
+	//		System.out.println(charset.decode(buffer));
+			buffer.flip();
+			while (buffer.hasRemaining()){
+				try {
+					socketChannel.write(buffer);
+				} catch (IOException ex) {
+					ex.printStackTrace();
+				}
 			}
-		buffer.clear();
-
+			buffer.clear();
+		}
 	}
 
+	//注册
 	private void jButton2MouseReleased(java.awt.event.MouseEvent evt) {
-		signUpView = new SignUpView(socketChannel, buffer);
-		signUpView.setLocationRelativeTo(null);
-		signUpView.setVisible(true);
+		SwingUtilities.invokeLater(new Runnable() {
+			public void run() {
+				signUpView = new SignUpView(socketChannel, buffer);
+				signUpView.setLocationRelativeTo(null);
+				signUpView.setVisible(true);
+			}
+		});
 	}
 
 	public void disposeSignUpView() {

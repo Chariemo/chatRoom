@@ -25,23 +25,17 @@ public class FriendDAO implements IFriendDAO{
 			return result;
 		}
 		
-		if (friend.getFriend_remark() == null) {
-			User temp = DAOFactory.createUserDAO().searchUserByCondition(friend.getFriend_account());
-			friend.setFriend_remark(temp.getUser_name());
-		}
-		
 		
 		Connection connection = ConnectionManager.getInstance().getConnection();
 		PreparedStatement pStatement = null;
 		
 		String sql = "INSERT INTO friends(user_account, friend_account, friend_remark) VALUES("
-				+ "?, ?, ?)";
+				+ "?, ?, null)";
 		try {
 			connection.setAutoCommit(false);
 			pStatement = connection.prepareStatement(sql);
 			pStatement.setString(1, friend.getUser_account());
 			pStatement.setString(2, friend.getFriend_account());
-			pStatement.setString(3, friend.getFriend_remark());
 			
 			pStatement.executeUpdate();
 			pStatement.close();
@@ -49,7 +43,6 @@ public class FriendDAO implements IFriendDAO{
 			pStatement = connection.prepareStatement(sql);
 			pStatement.setString(1, friend.getFriend_account());
 			pStatement.setString(2, friend.getUser_account());
-			pStatement.setString(3, null);
 			pStatement.executeUpdate();
 			
 			connection.commit();

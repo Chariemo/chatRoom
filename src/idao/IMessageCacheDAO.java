@@ -8,6 +8,6 @@ public interface IMessageCacheDAO {
 	
 	public boolean insert(MessageCache messageCache);
 	
-	public List<MessageCache> searchMessageCache(String to_account, int message_type);
+	public List<MessageCache> searchMessageCache(String to_account);
 	
 }
