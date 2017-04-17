@@ -4,9 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Time;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 import idao.IMessageCacheDAO;
@@ -17,10 +15,10 @@ public class MessageCacheDAO implements IMessageCacheDAO{
 
 	@SuppressWarnings("finally")
 	@Override
-	public boolean insert(String from_account, String to_account, String content) {
+	public boolean insert(MessageCache messageCache) {
 		
 		boolean result = false;
-		if (from_account == null || to_account == null || content == null) {
+		if (messageCache == null) {
 			return result;
 		}
 		
@@ -28,14 +26,15 @@ public class MessageCacheDAO implements IMessageCacheDAO{
 		PreparedStatement pStatement = null;
 		
 		String sql = "INSERT INTO messagecache (from_account, to_account, message_date, content, message_status, message_type)"
-				+ "VALUES (?, ?, now(), ?, ?, 'message')";
+				+ "VALUES (?, ?, now(), ?, ?, ?)";
 		
 		try {
 			pStatement = connection.prepareStatement(sql);
-			pStatement.setString(1, from_account);
-			pStatement.setString(2, to_account);
-			pStatement.setString(3, content);
+			pStatement.setString(1, messageCache.getFrom_account());
+			pStatement.setString(2, messageCache.getTo_account());
+			pStatement.setString(3, messageCache.getContent());
 			pStatement.setBoolean(4, false);
+			pStatement.setInt(5, messageCache.getMessage_type());
 			
 			pStatement.executeUpdate();
 			result = true;
@@ -50,7 +49,7 @@ public class MessageCacheDAO implements IMessageCacheDAO{
 
 	@SuppressWarnings("finally")
 	@Override
-	public List<MessageCache> searchMessageCache(String to_account) {
+	public List<MessageCache> searchMessageCache(String to_account, int message_type) {
 
 		List<MessageCache> result = new ArrayList<>();
 		if (to_account == null) {
@@ -62,11 +61,12 @@ public class MessageCacheDAO implements IMessageCacheDAO{
 		MessageCache message = null;
 		ResultSet resultSet = null;
 		
-		String sql = "CALL messageCacheHandle(?)";
+		String sql = "CALL messageCacheHandle(?, ?)";
 		
 		try {
 			pStatement = connection.prepareStatement(sql);
 			pStatement.setString(1, to_account);
+			pStatement.setInt(2, message_type);
 			
 			resultSet = pStatement.executeQuery();
 			while (resultSet.next()) {
@@ -76,7 +76,7 @@ public class MessageCacheDAO implements IMessageCacheDAO{
 				message.setTo_account(to_account);
 				message.setContent(resultSet.getString("content"));
 				message.setMessage_date(resultSet.getDate("message_date") + " " + resultSet.getTime("message_date"));
-				
+				message.setMessage_type(resultSet.getInt("message_type"));
 				result.add(message);
 			}
 			

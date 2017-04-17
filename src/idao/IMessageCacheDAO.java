@@ -6,8 +6,8 @@ import model.MessageCache;
 
 public interface IMessageCacheDAO {
 	
-	public boolean insert(String from_account, String to_account, String content);
+	public boolean insert(MessageCache messageCache);
 	
-	public List<MessageCache> searchMessageCache(String to_account);
+	public List<MessageCache> searchMessageCache(String to_account, int message_type);
 	
 }

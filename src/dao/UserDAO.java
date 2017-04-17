@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import idao.IUserDAO;
 import model.User;
 import util.ConnectionManager;
+import util.KeyIncrementer;
 
 public class UserDAO implements IUserDAO {
 

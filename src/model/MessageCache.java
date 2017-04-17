@@ -1,7 +1,5 @@
 package model;
 
-import java.util.Date;
-
 public class MessageCache {
 
 	private String from_account;
@@ -9,17 +7,17 @@ public class MessageCache {
 	private String message_date;
 	private String content;
 	private boolean message_status;
-	private String message_type;
+	private int message_type; //-1: 进群验证 	0： 好友验证	1：普通消息
 	
 	public MessageCache() {
 		
 	}
 	
-	public String getMessage_type() {
+	public int getMessage_type() {
 		return message_type;
 	}
 
-	public void setMessage_type(String message_type) {
+	public void setMessage_type(int message_type) {
 		this.message_type = message_type;
 	}
 	

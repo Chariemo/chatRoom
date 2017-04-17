@@ -18,6 +18,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.sun.corba.se.impl.protocol.giopmsgheaders.Message;
+
 import dao.FriendDAO;
 import dao.GroupDAO;
 import dao.MessageCacheDAO;
@@ -268,6 +270,7 @@ public class Server {
 			String[] arrayHead = null;
 			String protocol = null;
 			String account = null;
+			MessageCache messageCache = null;
 			
 			if (index == -1) {
 				
@@ -304,7 +307,13 @@ public class Server {
 			else if ("person".equals(protocol)) {
 				
 				if (arrayHead.length > 2) {
-					singleForward(account, arrayHead[2], strMessage, "person");
+					
+					messageCache = new MessageCache();
+					messageCache.setFrom_account(account);
+					messageCache.setTo_account(arrayHead[2]);
+					messageCache.setContent(strMessage);
+					messageCache.setMessage_type(1);
+					singleForward(messageCache, "person");
 				}
 			}
 			else if ("group".equals(protocol)) {
@@ -452,7 +461,7 @@ public class Server {
 		//获取并转发离线信息
 		private void handleMessageCache(User user) throws IOException {
 			
-			List<MessageCache> messageList = messageCacheDAO.searchMessageCache(user.getUser_account());
+			List<MessageCache> messageList = messageCacheDAO.searchMessageCache(user.getUser_account(), 1);
 			StringBuilder data = new StringBuilder();
 			data.append("person-");
 			if (!messageList.isEmpty()) {
@@ -465,6 +474,21 @@ public class Server {
 					poolThread.execute(new SendPacket(client, data.toString()));
 				}
 			}
+			
+			List<MessageCache> friendVerification = messageCacheDAO.searchMessageCache(user.getUser_account(), 0);
+			data.delete(0, data.length());
+			data.append("person-");
+			if (!friendVerification.isEmpty()) {
+				
+				for (MessageCache friendV : friendVerification) {
+					
+					data.append(friendV.getFrom_account());
+					data.append(":");
+					data.append(friendV.getContent());
+					poolThread.execute(new SendPacket(client, data.toString()));
+				}
+			}
+			//TODO 进群验证 好友验证
 			
 		}
 		
@@ -523,10 +547,10 @@ public class Server {
 		}
 		
 		//单发
-		private void singleForward(String from_account, String to_account, String strMessage, String attach) throws IOException {
+		private void singleForward(MessageCache messageCache, String attach) throws IOException {
 			
 			StringBuilder messageResponse = new StringBuilder();
-			User toUser = userDAO.searchUserByCondition(to_account);
+			User toUser = userDAO.searchUserByCondition(messageCache.getTo_account());
 			SocketChannel clientTarget = null;
 			
 			if (toUser == null) {
@@ -537,7 +561,7 @@ public class Server {
 			
 			if (!userOnline.containsKey(toUser.getUser_account())) {
 				
-				messageCacheDAO.insert(from_account, to_account, strMessage);
+				messageCacheDAO.insert(messageCache);
 				return;
 				
 			}
@@ -545,9 +569,9 @@ public class Server {
 			clientTarget = userOnline.get(toUser.getUser_account()).getClient();
 			messageResponse.append(attach);
 			messageResponse.append("-");
-			messageResponse.append(from_account);
+			messageResponse.append(messageCache.getFrom_account());
 			messageResponse.append(":");
-			messageResponse.append(strMessage);
+			messageResponse.append(messageCache.getContent());
 			poolThread.execute(new SendPacket(clientTarget, messageResponse.toString()));
 		}
 		
@@ -556,6 +580,7 @@ public class Server {
 			
 			String from_account = null;
 			int group_id  = 0;
+			MessageCache messageCache = null;
 			if (arrayHead.length > 2) {
 				
 				from_account = arrayHead[0];
@@ -574,7 +599,12 @@ public class Server {
 			}
 			for (User user : groupUsers) {
 				
-				singleForward(from_account, user.getUser_account(), strMessage, "group");
+				messageCache = new MessageCache();
+				messageCache.setFrom_account(from_account);
+				messageCache.setTo_account(user.getUser_account());
+				messageCache.setContent(strMessage);
+				messageCache.setMessage_type(1);
+				singleForward(messageCache, "group");
 			}			
 		}
 		
@@ -609,6 +639,7 @@ public class Server {
 			
 			String strResponse = "modifyfriend";
 			String method = arrayHead[2];
+			MessageCache messageCache = null;
 			Friend friend = new Friend(); 
 			
 			if ("deleteall".equals(method)){
@@ -635,12 +666,18 @@ public class Server {
 			
 			if ("add".equals(method)) {
 				
-				if (friendDAO.addFriend(friend)) {
+				messageCache = new MessageCache();
+				messageCache.setFrom_account(friend.getUser_account());
+				messageCache.setTo_account(friend.getFriend_account());
+				messageCache.setContent(userOnline.get(friend.getUser_account()).getUser_name() + " want to add you as a friend");
+				messageCache.setMessage_type(0);
+				singleForward(messageCache, "person");
+				/*if (friendDAO.addFriend(friend)) {
 					strResponse += ("-Add friend " + friend.getFriend_account() + " succeed");	
 				}
 				else {
 					strResponse += ("-Add friend " + friend.getFriend_account() + " failed");
-				}
+				}*/
 			}
 			else if ("update".equals(method)) {
 				

@@ -5,8 +5,6 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import com.sun.org.apache.bcel.internal.generic.NEW;
-
-import dao.KeyIncrementer;
 import dao.MessageCacheDAO;
 import dao.UserDAO;
 import idao.DAOFactory;
