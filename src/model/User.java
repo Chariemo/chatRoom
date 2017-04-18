@@ -97,9 +97,9 @@ public class User {
 
 	public String toString() {
 		StringBuilder result = new StringBuilder();
-		result.append("account: ");
+		result.append("account -> ");
 		result.append(user_account);
-		result.append(" name: ");
+		result.append(" name -> ");
 		result.append(user_name);
 		return result.toString();
 	}

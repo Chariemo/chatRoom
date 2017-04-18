@@ -222,12 +222,9 @@ public class UserDAO implements IUserDAO {
 
 	@SuppressWarnings("finally")
 	@Override
-	public List<User> searchUserByName(String user_name) {
+	public List<User> searchAllUsers() {
 		
 		List<User> result = null;
-		if (user_name == null) {
-			return result;
-		}
 		
 		Connection connection = ConnectionManager.getInstance().getConnection();
 		PreparedStatement pStatement = null;
@@ -235,11 +232,10 @@ public class UserDAO implements IUserDAO {
 		result = new ArrayList<>();
 		User user = null;
 		
-		String sql = "SELECT * FROM cruser WHERE user_name = ?";
+		String sql = "SELECT * FROM cruser";
 		
 		try {
 			pStatement = connection.prepareStatement(sql);
-			pStatement.setString(1, user_name);
 			
 			resultSet = pStatement.executeQuery();
 			
@@ -248,7 +244,6 @@ public class UserDAO implements IUserDAO {
 				user.setUser_account(resultSet.getString("user_account"));
 				user.setUser_id(resultSet.getInt("user_id"));
 				user.setUser_name(resultSet.getString("user_name"));
-				user.setUser_passwd(resultSet.getString("user_passwd"));
 				user.setUser_tel(resultSet.getString("user_tel"));
 				user.setUser_email(resultSet.getString("user_email"));
 				user.setUser_icon(resultSet.getString("user_icon"));

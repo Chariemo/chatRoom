@@ -7,7 +7,7 @@ public class MessageCache {
 	private String message_date;
 	private String content;
 	private boolean message_status;
-	private int message_type; //-1: 进群验证 	0： 好友验证	1：普通消息
+	private int message_type; //-1: 进群验证 	0： 好友验证	1：普通消息		2:群消息
 	
 	public MessageCache() {
 		

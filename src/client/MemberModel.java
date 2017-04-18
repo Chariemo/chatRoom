@@ -4,6 +4,7 @@ import javax.swing.ImageIcon;
 
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JTextField;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 
@@ -30,7 +31,7 @@ public class MemberModel {
 	public JButton jButton = null;// 显示好友头像；
 	public JPanel jPanel = new JPanel();// 模板容器；
 	
-	private JLabel lb_nickName = null;// 显示昵称；
+	public JLabel lb_nickName = null;// 显示昵称；
 	private String icon;
 	private String nickname = null;
 	public JLabel lb_online = null;// 是否在线
@@ -41,9 +42,6 @@ public class MemberModel {
 	private String friendAccount;
 	private String userAccount;
 	private SocketChannel socketChannel;
-	
-	private JPopupMenu pop;
-	private JMenuItem item1;
 	
 	private ChatView chatView;
 
@@ -87,6 +85,7 @@ public class MemberModel {
 		lb_nickName.setBounds(new Rectangle(52, 10, 80, 20));
 		lb_nickName.setFont(new Font("Dialog", Font.BOLD, 14));
 		lb_nickName.setText(nickname);
+		
 		jPanel.setSize(new Dimension(200, 67)); // 每个用户所占大小
 		jPanel.setLayout(null);
 		jPanel.add(getJButton(), null);
@@ -105,19 +104,6 @@ public class MemberModel {
 				startChat(e);
 			}
 		});
-		
-		pop = new JPopupMenu();
-		item1 = new JMenuItem("功能一");
-		pop.add(item1);
-		item1.addMouseListener(new MouseAdapter() {
-			public void mouseReleased(MouseEvent e) {
-				System.out.println("item 1");// 输出按钮的文本
-			}
-		});
-		jPanel.setComponentPopupMenu(pop);
-		lb_online.setComponentPopupMenu(pop);
-		lb_nickName.setComponentPopupMenu(pop);
-		jButton.setComponentPopupMenu(pop);
 	}
 
 	private void exchangeEnter() {
@@ -161,7 +147,8 @@ public class MemberModel {
 	}
 	
 	public void setChating(){
-		if (isChating){
+		if (isChating){	
+			chatView.getRootPane().setDefaultButton(chatView.jButton1);
 			chatView.show();
 		} else {
 			chatView = new ChatView(userAccount, friendAccount, socketChannel, icon, nickname);
@@ -169,6 +156,7 @@ public class MemberModel {
             chatView.setLocationRelativeTo(null);
      //       chatView.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 			isChating = true;
+			chatView.getRootPane().setDefaultButton(chatView.jButton1);
 		}
 	}
 	

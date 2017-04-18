@@ -7,6 +7,8 @@ import java.nio.charset.Charset;
 
 import javax.swing.JOptionPane;
 
+import model.User;
+
 /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
@@ -17,19 +19,19 @@ import javax.swing.JOptionPane;
  *
  * @author colin
  */
-public class SignUpView extends javax.swing.JFrame {
+public class ChangeUserInformation extends javax.swing.JFrame {
 
 	/**
 	 * Creates new form NewJFrame
 	 */
 	SocketChannel socketChannel;
-	private ByteBuffer buffer;
 	private Charset charset = Charset.forName("UTF-8");
+	private User user;
 
-	public SignUpView(SocketChannel socketChannel, ByteBuffer buffer) {
-		initComponents();
+	public ChangeUserInformation(SocketChannel socketChannel, User user) {
 		this.socketChannel = socketChannel;
-		this.buffer = buffer;
+		this.user = user;
+		initComponents();
 	}
 
 	/**
@@ -66,7 +68,7 @@ public class SignUpView extends javax.swing.JFrame {
 
 		setDefaultCloseOperation(javax.swing.JFrame.DISPOSE_ON_CLOSE);
 
-		jLabel2.setText("密码：");
+		jLabel2.setText("新密码：");
 
 		jButton3.setText("选择图片");
 		jButton3.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -75,12 +77,20 @@ public class SignUpView extends javax.swing.JFrame {
 			}
 		});
 		
-		jButton2.setText("注册");
+		jButton2.setText("确定");
 		jButton2.addMouseListener(new java.awt.event.MouseAdapter() {
 			public void mouseReleased(java.awt.event.MouseEvent evt) {
 				jButton2MouseReleased(evt);
 			}
 		});
+		
+		jTextField2.setText(user.getUser_name());
+		
+		jTextField3.setText(user.getUser_tel());
+		
+		jTextField4.setText(user.getUser_email());
+		
+		jButton3.setText(user.getUser_icon());
 
 		jLabel3.setText("昵称：");
 
@@ -168,11 +178,12 @@ public class SignUpView extends javax.swing.JFrame {
 		String tel = jTextField3.getText();
 		String email = jTextField4.getText();
 		String icon = jButton3.getText();
+		ByteBuffer buffer = ByteBuffer.allocate(512);
 
 		if (passwd.equals("") || name.equals("") || tel.equals("") || email.equals(""))
 			JOptionPane.showMessageDialog(this, "密码、昵称、手机、邮箱不能为空！");
 		else {
-			String signUpMessage = " " + "-signup-" + name + "-" + passwd + "-" + tel + "-" + email;
+			String signUpMessage = user.getUser_account() + "-modifyuser-update-" + name + "-" + passwd + "-" + tel + "-" + email;
 			
 			if (icon.equals(""))
 				signUpMessage += "- " + icon;
@@ -193,6 +204,7 @@ public class SignUpView extends javax.swing.JFrame {
 				}
 			}
 			buffer.clear();
+			this.dispose();
 		}
 	}
 

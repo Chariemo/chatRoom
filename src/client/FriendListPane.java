@@ -1,15 +1,28 @@
 package client;
 
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.nio.charset.Charset;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 
 import javax.swing.BorderFactory;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
+import javax.swing.SwingUtilities;
+
 
 import model.User;
+import sun.net.www.content.text.plain;
 
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 
@@ -21,13 +34,18 @@ public class FriendListPane extends JPanel {
 	private int clickF = 0;
 
 	private String userAccount;
-	private Map<User, JLabel> userLabelMap = new HashMap<>();
+	private Map<String, JLabel> userLabelMap = new HashMap<>();
 	private Map<String, MemberModel> friendsMap = new HashMap<>();
 	private SocketChannel socketChannel;
 	
 
+	private JPopupMenu pop;
+	private JMenuItem item1;
+	private JMenuItem item2;
+
 	public FriendListPane(String userAccount, SocketChannel socketChannel) {
 		super();
+		initialize();
 		this.userAccount = userAccount;
 		this.socketChannel = socketChannel;
 	}
@@ -43,58 +61,148 @@ public class FriendListPane extends JPanel {
 			public void mouseClicked(java.awt.event.MouseEvent e) {
 				clickF += 1;
 				if (clickF % 2 == 1) {
-					for (User user : userLabelMap.keySet()) {
-						userLabelMap.get(user).setVisible(false);
+					for (String userAccount : userLabelMap.keySet()) {
+						userLabelMap.get(userAccount).setVisible(false);
 					}
 					// listName.setIcon(new ImageIcon("icon/ico2.jpg"));
 					update();
 				} else {
-					for (User user : userLabelMap.keySet()) {
-						userLabelMap.get(user).setVisible(true);
+					for (String userAccount : userLabelMap.keySet()) {
+						userLabelMap.get(userAccount).setVisible(true);
 					}
 					// listName.setIcon(new ImageIcon("icon/ico.jpg"));
 					update();
 				}
 			}
 		});
-
-		// addJLabel();
+		this.add(listName, null);
 	}
 
 	private void update() {// 更新UI界面；
 		this.updateUI();
 	}
-	
+
 	public void addFriends(Map<User, String> friends) {
-		initialize();
-		this.add(listName, null);
 		
+		Iterator<User> iterator = friends.keySet().iterator();
+		while (iterator.hasNext()) {
+			User user = iterator.next();
+			if (user.getUser_account().equals(userAccount)) {
+				addFriend(user, user.getUser_name());
+				iterator.remove();
+			}
+		}
+
 		String friendName;
-		for (User friend : friends.keySet()) {
-			if (friends.get(friend).equals(""))
+		for (User friend : friends.keySet()) {			
+			if (friends.get(friend).equals(" "))
 				friendName = friend.getUser_name();
 			else
 				friendName = friends.get(friend);
-			friendLabel = new JLabel();
-			MemberModel memberModel;
-			friendLabel.setIcon(new ImageIcon("icon/bg.jpg"));
-			 if (friend.getIsOnline().equals("online")){
-				 memberModel = new MemberModel(friend.getUser_icon(), friendName, 200, true, userAccount, friend.getUser_account(), socketChannel);
-				 friendLabel.add(memberModel.jPanel);
-			 } else {
-				 memberModel = new MemberModel(friend.getUser_icon(), friendName, 200, false, userAccount, friend.getUser_account(), socketChannel);
-				 friendLabel.add(memberModel.jPanel);
-			 }
-			 
-			friendsMap.put(friend.getUser_account(), memberModel);
-			friendLabel.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
-			userLabelMap.put(friend, friendLabel);
-			this.add(friendLabel, null);
+			addFriend(friend, friendName);
 		}
-		
 		this.setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 		this.setSize(200, 408);
 		this.setLocation(20, 5);
+	}
+	
+	private void addFriend(User friend, String friendName) {
+		friendLabel = new JLabel();
+		MemberModel memberModel;
+		friendLabel.setIcon(new ImageIcon("icon/bg.jpg"));
+		if (friend.getIsOnline().equals("online")) {
+			memberModel = new MemberModel(friend.getUser_icon(), friendName, 200, true, userAccount,
+					friend.getUser_account(), socketChannel);
+			friendLabel.add(memberModel.jPanel);
+		} else {
+			memberModel = new MemberModel(friend.getUser_icon(), friendName, 200, false, userAccount,
+					friend.getUser_account(), socketChannel);
+			friendLabel.add(memberModel.jPanel);
+		}
+
+		friendsMap.put(friend.getUser_account(), memberModel);
+		friendLabel.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+		userLabelMap.put(friend.getUser_account(), friendLabel);
+		
+		this.add(friendLabel, null);
+
+		if (friend.getUser_account().equals(userAccount)) {
+			item1 = new JMenuItem("修改个人信息");
+			pop = new JPopupMenu();
+			pop.add(item1);
+			item1.addMouseListener(new MouseAdapter() {
+				public void mouseReleased(MouseEvent e) {
+					SwingUtilities.invokeLater(new Runnable() {
+						public void run() {
+							String pass = JOptionPane.showInputDialog("请输入密码");
+							if (friend.getUser_passwd().equals(pass)) {
+								ChangeUserInformation changeUserInformation = new ChangeUserInformation(
+										socketChannel, friend);
+								changeUserInformation.setLocationRelativeTo(null);
+								changeUserInformation.setVisible(true);
+							}
+						}
+					});
+				}
+			});
+		} else {
+			item1 = new JMenuItem("修改好友信息");
+			item2 = new JMenuItem("删除好友");
+			pop = new JPopupMenu();
+			pop.add(item1);
+			pop.add(item2);
+			item1.addMouseListener(new MouseAdapter() {
+				public void mouseReleased(MouseEvent e) {
+					String friendRemark = JOptionPane.showInputDialog("请输入新昵称");
+					if (friendRemark != null) {
+						ByteBuffer buffer = ByteBuffer.allocate(512);
+						String modifyFriendRemarkMessage = userAccount + "-modifyfriend-update-"
+								+ friend.getUser_account() + "-" + friendRemark;
+						buffer.putInt(modifyFriendRemarkMessage.getBytes(Charset.forName("UTF-8")).length);
+						buffer.put(Charset.forName("UTF-8").encode(modifyFriendRemarkMessage).array(), 0,
+								modifyFriendRemarkMessage.getBytes(Charset.forName("UTF-8")).length);
+						buffer.flip();
+						while (buffer.hasRemaining()) {
+							try {
+								socketChannel.write(buffer);
+							} catch (IOException e1) {
+								e1.printStackTrace();
+							}
+						}
+						buffer.clear();
+					}
+				}
+			});
+			item2.addMouseListener(new MouseAdapter() {
+				public void mouseReleased(MouseEvent e) {
+					int isDelete = JOptionPane.showConfirmDialog(null, "确定删除吗？", "提示",
+							JOptionPane.YES_NO_CANCEL_OPTION);
+					if (isDelete == JOptionPane.YES_OPTION) {
+						System.out.println("delete");
+						ByteBuffer buffer = ByteBuffer.allocate(512);
+						String modifyFriendRemarkMessage = userAccount + "-modifyfriend-delete-"
+								+ friend.getUser_account() + "-" + " ";
+						int messageLength = modifyFriendRemarkMessage.getBytes(Charset.forName("UTF-8")).length;
+						buffer.putInt(messageLength);
+						buffer.put(Charset.forName("UTF-8").encode(modifyFriendRemarkMessage).array(), 0,
+								messageLength);
+						buffer.flip();
+						while (buffer.hasRemaining()) {
+							try {
+								socketChannel.write(buffer);
+							} catch (IOException e1) {
+								e1.printStackTrace();
+							}
+						}
+						buffer.clear();
+					}
+				}
+			});
+		}
+		memberModel.jPanel.setComponentPopupMenu(pop);
+		memberModel.lb_online.setComponentPopupMenu(pop);
+		memberModel.lb_nickName.setComponentPopupMenu(pop);
+		memberModel.jButton.setComponentPopupMenu(pop);
 	}
 
 	public void setChating(String friendAccount, String content) {
@@ -112,4 +220,23 @@ public class FriendListPane extends JPanel {
 			friendsMap.get(friendAccount).changeOnlineStatus(true);
 	}
 
+	public void updateFriendRemark(String friendAccount, String friendRemark, boolean status) {
+		if (status)
+			friendsMap.get(friendAccount).lb_nickName.setText(friendRemark);
+		else
+			JOptionPane.showMessageDialog(null, "修改昵称失败");
+	}
+
+	public void deleteFriend(String friendAccount, boolean status) {
+		if (status) {
+			this.remove(userLabelMap.get(friendAccount));
+			update();
+		} else {
+			JOptionPane.showMessageDialog(null, "删除好友失败");
+		}
+	}
+	
+	public void updateFriends(Map<User, String> friendMap) {
+		addFriends(friendMap);
+	}
 }

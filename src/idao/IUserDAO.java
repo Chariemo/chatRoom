@@ -14,7 +14,7 @@ public interface IUserDAO {
 	
 	public boolean verify(String user_lognIn, String user_passwd);
 	
-	public List<User> searchUserByName(String user_name);
+	public List<User> searchAllUsers();
 	
 	public User searchUserByCondition(String demand);
 	

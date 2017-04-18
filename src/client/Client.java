@@ -37,6 +37,7 @@ public class Client {
 
 	private SignInView signInView;
 	private FriendsView friendsView;
+
 	private String selfAccount;
 
 	public Client(InetSocketAddress socketAddress) {
@@ -49,18 +50,6 @@ public class Client {
 		socketChannel.configureBlocking(false);
 		socketChannel.register(selector, SelectionKey.OP_CONNECT);
 		socketChannel.connect(serverAddress);
-
-		try {
-			infoSignInView();
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
-		} catch (InstantiationException e) {
-			e.printStackTrace();
-		} catch (IllegalAccessException e) {
-			e.printStackTrace();
-		} catch (UnsupportedLookAndFeelException e) {
-			e.printStackTrace();
-		}
 	}
 
 	private void infoSignInView() throws ClassNotFoundException, InstantiationException, IllegalAccessException,
@@ -119,6 +108,17 @@ public class Client {
 							if (socketChannel.isConnectionPending()) {
 								socketChannel.finishConnect();
 								System.out.println("achieve connectionPending");
+								try {
+									infoSignInView();
+								} catch (ClassNotFoundException e) {
+									e.printStackTrace();
+								} catch (InstantiationException e) {
+									e.printStackTrace();
+								} catch (IllegalAccessException e) {
+									e.printStackTrace();
+								} catch (UnsupportedLookAndFeelException e) {
+									e.printStackTrace();
+								}
 							}
 
 							selectionKey.interestOps(SelectionKey.OP_READ);
@@ -189,7 +189,7 @@ public class Client {
 			String protocol;
 			String account;
 			String content;
-			if (message.split(":")[0].split("-").length > 1){
+			if (message.split(":")[0].split("-").length > 1) {
 				protocol = message.split(":")[0].split("-")[1];
 				content = message.split(":")[1];
 			} else {
@@ -203,12 +203,13 @@ public class Client {
 					isSignIn = true;
 					System.out.println("Already connect to server");
 					signInView.dispose();
-					
+
 					selfAccount = account;
+
 					friendsView = new FriendsView(account, socketChannel);
 					friendsView.getJFrame().setVisible(true);
 					friendsView.getJFrame().setLocation(1100, 60);
-					
+
 				} else if (("Already Sign In").equals(content)) {
 					isSignIn = false;
 					JOptionPane.showMessageDialog(null, "该用户已经登陆！");
@@ -232,38 +233,34 @@ public class Client {
 	}
 
 	private void handleMessage(String message) {
-		
 		int index = message.indexOf(":");
 		String content = null;
 		String tmp = null;
 		String protocol = null;
 		
-		if (index != -1){
-			
+		System.out.println("message: " + message);
+
+		if (index != -1) {
 			content = message.substring(index + 1, message.length());
 			tmp = message.substring(0, index);
 			protocol = tmp.split("-")[0];
 		} else {
-			
 			index = message.indexOf("-");
 			protocol = message.substring(0, index);
 			tmp = message.substring(index + 1, message.length());
 		}
-		
+
 		if (("person").equals(protocol)) {
-			
 			String fromAccount = tmp.split("-")[1];
 			friendsView.setChating(fromAccount, content);
 		} else if ("group".equals(protocol)) {
-			
-			String fromName = tmp.split("-")[1];
-			System.out.println(fromName + " : " + content);
+			String fromAccount = tmp.split("-")[1];
+			System.out.println(fromAccount + " : " + content);
+			friendsView.setGroupChating(fromAccount, content);
 		} else if (("friends").equals(protocol)) {
-			
 			Map<User, String> friendMap = new HashMap<>();
 			String[] friends = content.split(":");
-			for (int i = 1; i < friends.length; i++){
-				
+			for (int i = 0; i < friends.length; i++) {
 				String[] friendInformation = friends[i].split("-");
 				User friend = new User();
 				friend.setUser_account(friendInformation[0]);
@@ -272,27 +269,84 @@ public class Client {
 				friend.setUser_email(friendInformation[4]);
 				friend.setUser_icon(friendInformation[5]);
 				friend.setIsOnline(friendInformation[6]);
-			
-				String friendRemark = friendInformation[2];
 				
-				friendMap.put(friend, friendRemark);
+				if (i == 0) {
+					friend.setUser_passwd(friendInformation[2]);
+					friendMap.put(friend, " ");
+				} else {
+					String friendRemark = friendInformation[2];
+					friendMap.put(friend, friendRemark);
+				}
+
 			}
-			
+
 			friendsView.addFriends(friendMap);
-		} else if (("logout").equals(protocol)){
-			
+		} else if (("modifyfriend").equals(protocol)) {
+
+			String method = tmp.split(" ")[0];
+			if (method.equals("update")) {
+				String friendRemark = tmp.split(" ")[1];
+				String friendAccount = tmp.split(" ")[2];
+				boolean status;
+				if (tmp.split(" ")[3].equals("succeed"))
+					status = true;
+				else
+					status = false;
+				friendsView.updateFriendRemark(friendAccount, friendRemark, status);
+			}
+			if (method.equals("delete")) {
+				String friendAccount = tmp.split(" ")[2];
+				boolean status;
+				if (tmp.split(" ")[3].equals("succeed"))
+					status = true;
+				else
+					status = false;
+				friendsView.deleteFriend(friendAccount, status);
+			}
+
+			if (method.equals("add")) {
+				boolean status;
+				String[] friendInformation = tmp.substring(tmp.indexOf(" ") + 1, tmp.length()).split("-");
+				Map<User, String> friendMap = new HashMap<>();
+				if (friendInformation[7].equals("succeed")) {
+					status = true;
+					String friendAccount = friendInformation[0];
+					String friendName = friendInformation[1];
+					String friendRemark = friendInformation[2];
+					String friendTel = friendInformation[3];
+					String friendEmail = friendInformation[4];
+					String friendIcon = friendInformation[5];
+					String isOnline = friendInformation[6];
+					
+					System.out.println(friendName + " " + isOnline);
+					
+					User friend = new User();
+					friend.setUser_account(friendAccount);
+					friend.setUser_name(friendName);
+					friend.setUser_tel(friendTel);
+					friend.setUser_email(friendEmail);
+					friend.setUser_icon(friendIcon);
+					friend.setIsOnline(isOnline);
+					
+					friendMap.put(friend, friendRemark);
+					friendsView.updateFriends(friendMap, status);
+				} else {
+					status = false;
+					friendsView.updateFriends(null, status);
+				}
+			}
+		} else if (("logout").equals(protocol)) {
 			String logoutAccount = tmp;
 			friendsView.setLogoutFriend(logoutAccount);
-		} else if (("login").equals(protocol)){
-			
+		} else if (("login").equals(protocol)) {
 			String loginAccount = tmp;
 			friendsView.setLoginFriend(loginAccount);
 		} else if ("verification".equals(protocol)) {
-			
+
 			MessageCache messageCache = new MessageCache();
 			messageCache.setFrom_account(tmp.split("-")[1]);
 			messageCache.setTo_account(selfAccount);
-			
+
 			index = content.lastIndexOf(":");
 			messageCache.setContent(content.substring(0, index));
 			messageCache.setMessage_type(Integer.parseInt(content.substring(index + 1, content.length())));
@@ -300,9 +354,9 @@ public class Client {
 			messageVerificationView.setLocationRelativeTo(null);
 			messageVerificationView.setVisible(true);
 		} else if ("searchperson".equals(protocol)) {
-			
+
 			friendsView.setSearchPerson(content);
-		}
+		} 
 		else {
 			System.out.println(message);
 		}
