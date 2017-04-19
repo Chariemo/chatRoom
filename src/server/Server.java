@@ -87,6 +87,7 @@ public class Server {
 
 	public void handleConnection() throws IOException {
 
+		poolThread.execute(new FileServer(userOnline, poolThread));
 		System.out.println("Server has started");
 		while (true) {
 
@@ -118,7 +119,6 @@ public class Server {
 
 						Boolean finished = (Boolean) key.attachment();
 						if (finished) {
-
 							finished = false;
 							key.attach(finished);
 							poolThread.execute(new MessageHandler(key));
@@ -468,9 +468,9 @@ public class Server {
 					}
 					strResponse.append(":");
 				}
-				if ("login".equals(attach)) {
-					poolThread.execute(new SendPacket(client, strResponse.toString()));
-				}
+			}
+			if ("login".equals(attach)) {
+				poolThread.execute(new SendPacket(client, strResponse.toString()));
 			}
 		}
 
@@ -484,11 +484,18 @@ public class Server {
 
 					if (messageCache.getMessage_type() == 1) { // 普通消息
 						singleForward(messageCache, "person");
-					} else if (messageCache.getMessage_type() == -1) { // 群验证
+					} 
+					else if (messageCache.getMessage_type() == -1) { // 群验证
 
-					} else if (messageCache.getMessage_type() == 0) { // 好友验证
+					} 
+					else if (messageCache.getMessage_type() == 0) { // 好友验证
 						singleForward(messageCache, "verification");
-					} else { // 群消息
+						
+					} 
+					else if (messageCache.getMessage_type() == 9) { //缓存文件消息
+						singleForward(messageCache, "receivefile");
+					}
+					else { // 群消息
 						singleForward(messageCache, "group");
 					}
 				}
@@ -573,7 +580,7 @@ public class Server {
 			messageResponse.append(":");
 			messageResponse.append(messageCache.getContent());
 
-			if (messageCache.getMessage_type() != 1 && messageCache.getMessage_type() != 2) {
+			if (messageCache.getMessage_type() == 22 || messageCache.getMessage_type() == -1 || messageCache.getMessage_type() == 0) {
 				messageResponse.append(":");
 				messageResponse.append(messageCache.getMessage_type());
 			}
@@ -752,9 +759,10 @@ public class Server {
 					strResponse += ("-delete friend " + friend.getFriend_account() + " failed");
 					responseToFriend += ("-delete friend " + friend.getUser_account() + " failed");
 				}
-
-				if ((friendClient = userOnline.get(friend.getFriend_account()).getClient()) != null) {
-					poolThread.execute(new SendPacket(friendClient, responseToFriend));
+				
+				User user = null;
+				if ((user = userOnline.get(friend.getFriend_account())) != null) {
+					poolThread.execute(new SendPacket(user.getClient(), responseToFriend));
 				}
 			}
 			poolThread.execute(new SendPacket(client, strResponse));

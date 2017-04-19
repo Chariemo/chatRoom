@@ -28,13 +28,14 @@ import java.awt.PopupMenu;
 
 public class MemberModel {
 	private static final long serialVersionUID = 1L;
-	public JButton jButton = null;// 显示好友头像；
 	public JPanel jPanel = new JPanel();// 模板容器；
 	
+	public JButton jButton = null;// 显示好友头像；
 	public JLabel lb_nickName = null;// 显示昵称；
+	public JLabel lb_online = null;// 是否在线
+	
 	private String icon;
 	private String nickname = null;
-	public JLabel lb_online = null;// 是否在线
 
 	private boolean isOnline;
 	private boolean isChating;
@@ -42,7 +43,7 @@ public class MemberModel {
 	private String friendAccount;
 	private String userAccount;
 	private SocketChannel socketChannel;
-	
+	private SocketChannel fileSocketChannel = null;
 	private ChatView chatView;
 
 	public MemberModel(String icon, String nickname, int len, boolean isOnline, String userAccount,String friendAccount, SocketChannel socketChannel) {
@@ -146,12 +147,13 @@ public class MemberModel {
 			lb_online.setText("离线");
 	}
 	
-	public void setChating(){
+	public void setChating(SocketChannel fileSockeChannel){
+		this.fileSocketChannel = fileSockeChannel;
 		if (isChating){	
 			chatView.getRootPane().setDefaultButton(chatView.jButton1);
 			chatView.show();
 		} else {
-			chatView = new ChatView(userAccount, friendAccount, socketChannel, icon, nickname);
+			chatView = new ChatView(userAccount, friendAccount, socketChannel, icon, nickname, fileSockeChannel);
 			chatView.setVisible(true);
             chatView.setLocationRelativeTo(null);
      //       chatView.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
@@ -168,7 +170,7 @@ public class MemberModel {
 	    if (e.getClickCount()==2){
 	    	java.awt.EventQueue.invokeLater(new Runnable() {
 	            public void run() {
-	            	setChating();
+	            	setChating(fileSocketChannel);
 	            }
 	        });
 	    }

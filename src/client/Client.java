@@ -1,23 +1,20 @@
 package client;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
 
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.UnsupportedLookAndFeelException;
-
-import com.sun.javafx.applet.Splash;
 
 import model.MessageCache;
 import model.User;
@@ -26,20 +23,20 @@ public class Client {
 	private Selector selector;
 	private InetSocketAddress serverAddress;
 	private SocketChannel socketChannel;
-
 	private final int BLOCK = 2048;
 	private final ByteBuffer sendBuffer = ByteBuffer.allocate(BLOCK);
 	private final ByteBuffer receiveBuffer = ByteBuffer.allocate(BLOCK);
-
 	private Charset charset = Charset.forName("UTF-8");
-
 	private static boolean isSignIn;
-
 	private SignInView signInView;
 	private FriendsView friendsView;
-
 	private String selfAccount;
-
+	private static String address = "localhost";
+	private static int filePort = 6790;
+	private static String downloadPath = "downloads/";
+	private FileOutputStream fileOutputStream;
+	SocketChannel fileSocketChannel = null;
+	
 	public Client(InetSocketAddress socketAddress) {
 		this.serverAddress = socketAddress;
 	}
@@ -237,8 +234,6 @@ public class Client {
 		String content = null;
 		String tmp = null;
 		String protocol = null;
-		
-		System.out.println("message: " + message);
 
 		if (index != -1) {
 			content = message.substring(index + 1, message.length());
@@ -252,7 +247,7 @@ public class Client {
 
 		if (("person").equals(protocol)) {
 			String fromAccount = tmp.split("-")[1];
-			friendsView.setChating(fromAccount, content);
+			friendsView.setChating(fromAccount, content, fileSocketChannel);
 		} else if ("group".equals(protocol)) {
 			String fromAccount = tmp.split("-")[1];
 			System.out.println(fromAccount + " : " + content);
@@ -269,7 +264,7 @@ public class Client {
 				friend.setUser_email(friendInformation[4]);
 				friend.setUser_icon(friendInformation[5]);
 				friend.setIsOnline(friendInformation[6]);
-				
+
 				if (i == 0) {
 					friend.setUser_passwd(friendInformation[2]);
 					friendMap.put(friend, " ");
@@ -317,9 +312,9 @@ public class Client {
 					String friendEmail = friendInformation[4];
 					String friendIcon = friendInformation[5];
 					String isOnline = friendInformation[6];
-					
+
 					System.out.println(friendName + " " + isOnline);
-					
+
 					User friend = new User();
 					friend.setUser_account(friendAccount);
 					friend.setUser_name(friendName);
@@ -327,7 +322,7 @@ public class Client {
 					friend.setUser_email(friendEmail);
 					friend.setUser_icon(friendIcon);
 					friend.setIsOnline(isOnline);
-					
+
 					friendMap.put(friend, friendRemark);
 					friendsView.updateFriends(friendMap, status);
 				} else {
@@ -346,24 +341,99 @@ public class Client {
 			MessageCache messageCache = new MessageCache();
 			messageCache.setFrom_account(tmp.split("-")[1]);
 			messageCache.setTo_account(selfAccount);
-
-			index = content.lastIndexOf(":");
-			messageCache.setContent(content.substring(0, index));
-			messageCache.setMessage_type(Integer.parseInt(content.substring(index + 1, content.length())));
+			int index1 = content.lastIndexOf(":");
+			messageCache.setContent(content.substring(0, index1));
+			messageCache.setMessage_type(Integer.parseInt(content.substring(index1 + 1, content.length())));
 			MessageVerificationView messageVerificationView = new MessageVerificationView(messageCache, socketChannel);
 			messageVerificationView.setLocationRelativeTo(null);
 			messageVerificationView.setVisible(true);
 		} else if ("searchperson".equals(protocol)) {
 
 			friendsView.setSearchPerson(content);
-		} 
+		} else if ("modifyuser".equals(protocol)) {
+			String method = tmp.split(" ")[0];
+			String[] userInformation = tmp.substring(tmp.indexOf(" ") + 1, tmp.length()).split("-");
+			if (method.equals("update")) {
+				boolean status;
+				if (userInformation[7].equals("succeed")) {
+					String userAccount = userInformation[0];
+					String userPass = userInformation[2];
+					String userName = userInformation[1];
+					String userTel = userInformation[3];
+					String userEmail = userInformation[4];
+					String userIcon = userInformation[5];
+					String isOnline = userInformation[6];
+					
+					User user = new User();
+					user.setUser_account(userAccount);
+					user.setUser_passwd(userPass);
+					user.setUser_name(userName);
+					user.setUser_tel(userTel);
+					user.setUser_email(userEmail);
+					user.setUser_icon(userIcon);
+					user.setIsOnline(isOnline);
+					
+					status = true;
+					friendsView.updateUserInformation(user, status);
+				} else {
+					status = false;
+					friendsView.updateUserInformation(null, status);
+				}
+			}
+		} else if ("receivefile".equals(protocol)) {
+	
+			System.out.println(tmp.split("-")[1] + " " + content);
+			receiveFile(tmp.split("-")[1], content);
+		}
 		else {
 			System.out.println(message);
 		}
 	}
+	
+	private void receiveFile(String from_account, String fileMessage) {
+		
+		int index = fileMessage.lastIndexOf("/");
+		String filename = fileMessage.substring(index + 13, fileMessage.length());
+		String verifyMessage = selfAccount + "-receivefile-" + from_account + "-" + fileMessage;
+		byte[] byteVMessage = verifyMessage.getBytes(charset);
+		int length = byteVMessage.length;
+		
+		ByteBuffer buffer = ByteBuffer.allocate(BLOCK);
+		buffer.putInt(length);
+		buffer.put(byteVMessage);
+		buffer.flip();
+		try {
+			fileOutputStream = new FileOutputStream(downloadPath + filename);
+			FileChannel fileChannel = fileOutputStream.getChannel();
+			if (fileSocketChannel == null || !fileSocketChannel.socket().isConnected()) {
+				
+				fileSocketChannel = SocketChannel.open(new InetSocketAddress(address, filePort));
+				fileSocketChannel.configureBlocking(false);
+			}
+			
+			while (buffer.hasRemaining()) {
+				fileSocketChannel.write(buffer);
+			}
+			
+			buffer.clear();
+			while (fileSocketChannel.read(buffer) != -1) {
+				
+				buffer.flip();
+				while (buffer.hasRemaining()) {
+					fileChannel.write(buffer);
+				}
+				buffer.clear();
+			}
+			
+			fileChannel.close();
+			fileSocketChannel.close();
+		} catch (IOException e) {
+			System.err.println(e);
+		}
+	}
 
 	public static void main(String[] args) {
-		InetSocketAddress socketAddress = new InetSocketAddress("localhost", 6789);
+		InetSocketAddress socketAddress = new InetSocketAddress(address, 6789);
 		Client client = new Client(socketAddress);
 		try {
 			client.start();

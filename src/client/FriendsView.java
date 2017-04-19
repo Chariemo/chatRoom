@@ -1,5 +1,7 @@
 package client;
 
+import java.awt.BorderLayout;
+
 import java.nio.channels.SocketChannel;
 import java.util.Map;
 import java.awt.event.ActionEvent;
@@ -10,6 +12,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.ScrollPaneConstants;
+
 import model.User;
 
 public class FriendsView {
@@ -34,7 +37,7 @@ public class FriendsView {
 		if (jFrame == null) {
 			jFrame = new JFrame();
 			jFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-			jFrame.setSize(250, 600);
+			jFrame.setSize(230, 600);
 			jFrame.setTitle("好友列表");
 			jFrame.setContentPane(getJContentPane());
 		}
@@ -92,17 +95,15 @@ public class FriendsView {
 				}
 			});
 			jContentPane.add(addFriendButton);
-			
 		}
 		return jContentPane;
 	}
 	
-	public void setChating(String account, String content){
-		friendListPane.setChating(account, content);
+	public void setChating(String account, String content, SocketChannel fileSockeChannel){
+		friendListPane.setChating(account, content, fileSockeChannel);
 	}
-
+	
 	public void setGroupChating(String account, String content) {
-		
 		
 		if (groupChating) {
 			groupChatView.receiveMessage(account, content);
@@ -146,4 +147,12 @@ public class FriendsView {
 		else
 			JOptionPane.showMessageDialog(null, "对方拒绝了你的邀请");
 	}
+	
+	public void updateUserInformation(User user, boolean status) {
+		if (status) {
+			friendListPane.updateUserInformation(user);
+		} else {
+			JOptionPane.showMessageDialog(null, "修改个人信息失败");
+		}
+	} 
 }
