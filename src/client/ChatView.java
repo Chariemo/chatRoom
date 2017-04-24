@@ -36,7 +36,7 @@ public class ChatView extends javax.swing.JFrame {
 	private SocketChannel socketChannel;
 	private String icon;
 	private String name;
-	private ByteBuffer buffer = ByteBuffer.allocate(1024);
+	
 	private String address = "localhost";
 	private SocketChannel filesocketChannel;
 
@@ -73,16 +73,6 @@ public class ChatView extends javax.swing.JFrame {
         setDefaultCloseOperation(javax.swing.JFrame.DISPOSE_ON_CLOSE);
         setTitle(userAccount + "'s chatRoom...");
         this.getRootPane().setDefaultButton(jButton1);
-//        addWindowListener(new WindowAdapter() {
-//            @Override
-//            public void windowClosing(WindowEvent e) {
-//            	
-//            }
-//            @Override
-//            public void windowClosed(WindowEvent e) {
-//            	isChating = false;
-//            }
-//        });
 
         jLabel1.setIcon(new ImageIcon(icon));
 
@@ -168,60 +158,119 @@ public class ChatView extends javax.swing.JFrame {
  // 发送文件
  	private void jButton2MouseReleased(java.awt.event.MouseEvent evt) {
  		
- 		FileSelectView fileSelectView = new FileSelectView();
- 		fileSelectView.setVisible(true);
- 		fileSelectView.setLocationRelativeTo(null);
- 		fileSelectView.jFileChooser1.setMultiSelectionEnabled(true);
- 		fileSelectView.jFileChooser1.setDialogTitle("请选择要发送的文件...");
-		int returnVal = fileSelectView.jFileChooser1.showOpenDialog(null);
-		File file = null;
-		
-		if (JFileChooser.APPROVE_OPTION == returnVal) {
-			
-			file = fileSelectView.jFileChooser1.getSelectedFile();
-			fileSelectView.dispose();
-		} else {
-			
-			JOptionPane.showMessageDialog(null, "打开文件类型错误！");
-			fileSelectView.dispose();
-		}
-		if (filesocketChannel == null || !filesocketChannel.socket().isConnected()) {
-			try {
-				filesocketChannel = SocketChannel.open(new InetSocketAddress(address, 6790));
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-		
-		if (file != null) {
-			try {
-				String fileMessage = userAccount + "-" + friendAccount + "-" + file.getName();
-				int messageLengh = fileMessage.getBytes(charset).length;
-				buffer.clear();
-				buffer.putInt(messageLengh);
-				buffer.put(charset.encode(fileMessage).array(), 0, messageLengh);
-				buffer.flip();
-				buffer.rewind();
-				filesocketChannel.write(buffer);
-				buffer.clear();
-				FileChannel fileChannel = new FileInputStream(file).getChannel();	
-				while (fileChannel.read(buffer) > 0){
-					
-					buffer.flip();
-					while (buffer.hasRemaining())
-						filesocketChannel.write(buffer);
-					buffer.clear();
-				}
-				fileChannel.close();
-				filesocketChannel.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
+ 		new sendFileThread().start();
+// 		FileSelectView fileSelectView = new FileSelectView();
+// 		fileSelectView.setVisible(true);
+// 		fileSelectView.setLocationRelativeTo(null);
+// 		fileSelectView.jFileChooser1.setMultiSelectionEnabled(true);
+// 		fileSelectView.jFileChooser1.setDialogTitle("请选择要发送的文件...");
+//		int returnVal = fileSelectView.jFileChooser1.showOpenDialog(null);
+//		File file = null;
+//		
+//		if (JFileChooser.APPROVE_OPTION == returnVal) {
+//			file = fileSelectView.jFileChooser1.getSelectedFile();
+//			fileSelectView.dispose();
+//		} else {
+////			JOptionPane.showMessageDialog(null, "打开文件类型错误！");
+//			fileSelectView.dispose();
+//		}
+//		if (filesocketChannel == null || !filesocketChannel.socket().isConnected()) {
+//			try {
+//				filesocketChannel = SocketChannel.open(new InetSocketAddress(address, 6790));
+//			} catch (IOException e) {
+//				e.printStackTrace();
+//			}
+//		}
+//		
+//		if (file != null) {
+//			try {
+//				String fileMessage = userAccount + "-" + friendAccount + "-" + file.getName();
+//				int messageLengh = fileMessage.getBytes(charset).length;
+//				buffer.clear();
+//				buffer.putInt(messageLengh);
+//				buffer.put(charset.encode(fileMessage).array(), 0, messageLengh);
+//				buffer.flip();
+//				buffer.rewind();
+//				filesocketChannel.write(buffer);
+//				buffer.clear();
+//				FileChannel fileChannel = new FileInputStream(file).getChannel();	
+//				while (fileChannel.read(buffer) > 0){
+//					buffer.flip();
+//					while (buffer.hasRemaining())
+//						filesocketChannel.write(buffer);
+//					buffer.clear();
+//				}
+//				filesocketChannel.close();
+//				fileChannel.close();
+////				filesocketChannel.socket().close();
+//				System.out.println("hear");
+//			} catch (IOException e) {
+//				e.printStackTrace();
+//			}
+//		}
+ 	}
+ 	
+ 	private class sendFileThread extends Thread {
+ 		
+ 		ByteBuffer buffer = ByteBuffer.allocate(1024);
+ 		
+ 		public void run() {
+ 			FileSelectView fileSelectView = new FileSelectView();
+ 	 		fileSelectView.setVisible(true);
+ 	 		fileSelectView.setLocationRelativeTo(null);
+ 	 		fileSelectView.jFileChooser1.setMultiSelectionEnabled(true);
+ 	 		fileSelectView.jFileChooser1.setDialogTitle("请选择要发送的文件...");
+ 			int returnVal = fileSelectView.jFileChooser1.showOpenDialog(null);
+ 			File file = null;
+ 			
+ 			if (JFileChooser.APPROVE_OPTION == returnVal) {
+ 				file = fileSelectView.jFileChooser1.getSelectedFile();
+ 				fileSelectView.dispose();
+ 			} else {
+// 				JOptionPane.showMessageDialog(null, "打开文件类型错误！");
+ 				fileSelectView.dispose();
+ 			}
+ 			if (filesocketChannel == null || !filesocketChannel.socket().isConnected()) {
+ 				try {
+ 					filesocketChannel = SocketChannel.open(new InetSocketAddress(address, 6790));
+ 				} catch (IOException e) {
+ 					e.printStackTrace();
+ 				}
+ 			}
+ 			
+ 			if (file != null) {
+ 				try {
+ 					String fileMessage = userAccount + "-" + friendAccount + "-" + file.getName();
+ 					int messageLengh = fileMessage.getBytes(charset).length;
+ 					buffer.clear();
+ 					buffer.putInt(messageLengh);
+ 					buffer.put(charset.encode(fileMessage).array(), 0, messageLengh);
+ 					buffer.flip();
+ 					buffer.rewind();
+ 					filesocketChannel.write(buffer);
+ 					buffer.clear();
+ 					FileChannel fileChannel = new FileInputStream(file).getChannel();	
+ 					while (fileChannel.read(buffer) > 0){
+ 						buffer.flip();
+ 						while (buffer.hasRemaining())
+ 							filesocketChannel.write(buffer);
+ 						buffer.clear();
+ 					}
+ 					filesocketChannel.close();
+ 					fileChannel.close();
+// 					filesocketChannel.socket().close();
+ 					System.out.println("hear");
+ 				} catch (IOException e) {
+ 					e.printStackTrace();
+ 				}
+ 			}
+ 		}
  	}
 
  	// 发送消息
  	private void sendLisener (ActionEvent e) {
+ 		
+ 		ByteBuffer buffer = ByteBuffer.allocate(1024);
  		String content = jTextField1.getText();
  		String message = userAccount + "-" + "person" + "-" + friendAccount + ":" + content;
  		int messageLength = message.getBytes(charset).length;

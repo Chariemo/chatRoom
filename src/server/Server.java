@@ -735,7 +735,7 @@ public class Server {
 					messageCache.setFrom_account(friend.getUser_account());
 					messageCache.setTo_account(friend.getFriend_account());
 					messageCache.setContent(
-							userOnline.get(friend.getUser_account()) + " don't not agree" + " add you as a friend");
+							userOnline.get(friend.getUser_account()) + " don't agree" + " add you as a friend");
 					messageCache.setMessage_type(22);
 					singleForward(messageCache, "verification");
 					return;

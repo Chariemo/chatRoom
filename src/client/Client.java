@@ -383,52 +383,61 @@ public class Client {
 		} else if ("receivefile".equals(protocol)) {
 	
 			System.out.println(tmp.split("-")[1] + " " + content);
-			receiveFile(tmp.split("-")[1], content);
+			new ReceiveFile(tmp.split("-")[1], content).start();
 		}
 		else {
 			System.out.println(message);
 		}
 	}
 	
-	private void receiveFile(String from_account, String fileMessage) {
+	class ReceiveFile extends Thread {
 		
-		int index = fileMessage.lastIndexOf("/");
-		String filename = fileMessage.substring(index + 13, fileMessage.length());
-		String verifyMessage = selfAccount + "-receivefile-" + from_account + "-" + fileMessage;
-		byte[] byteVMessage = verifyMessage.getBytes(charset);
-		int length = byteVMessage.length;
-		
-		ByteBuffer buffer = ByteBuffer.allocate(BLOCK);
-		buffer.putInt(length);
-		buffer.put(byteVMessage);
-		buffer.flip();
-		try {
-			fileOutputStream = new FileOutputStream(downloadPath + filename);
-			FileChannel fileChannel = fileOutputStream.getChannel();
-			if (fileSocketChannel == null || !fileSocketChannel.socket().isConnected()) {
-				
-				fileSocketChannel = SocketChannel.open(new InetSocketAddress(address, filePort));
-				fileSocketChannel.configureBlocking(false);
-			}
+		private String from_account = null;
+		private String fileMessage = null;
+		public ReceiveFile(String from_account, String fileMessage) {
 			
-			while (buffer.hasRemaining()) {
-				fileSocketChannel.write(buffer);
-			}
+			this.from_account = from_account;
+			this.fileMessage = fileMessage;
+		}
+		public void run() {
+			int index = fileMessage.lastIndexOf("/");
+			String filename = fileMessage.substring(index + 13, fileMessage.length());
+			String verifyMessage = selfAccount + "-receivefile-" + from_account + "-" + fileMessage;
+			byte[] byteVMessage = verifyMessage.getBytes(charset);
+			int length = byteVMessage.length;
 			
-			buffer.clear();
-			while (fileSocketChannel.read(buffer) != -1) {
-				
-				buffer.flip();
-				while (buffer.hasRemaining()) {
-					fileChannel.write(buffer);
+			ByteBuffer buffer = ByteBuffer.allocate(BLOCK);
+			buffer.putInt(length);
+			buffer.put(byteVMessage);
+			buffer.flip();
+			try {
+				fileOutputStream = new FileOutputStream(downloadPath + filename);
+				FileChannel fileChannel = fileOutputStream.getChannel();
+				if (fileSocketChannel == null || !fileSocketChannel.socket().isConnected()) {
+					
+					fileSocketChannel = SocketChannel.open(new InetSocketAddress(address, filePort));
+					fileSocketChannel.configureBlocking(false);
 				}
+				
+				while (buffer.hasRemaining()) {
+					fileSocketChannel.write(buffer);
+				}
+				
 				buffer.clear();
+				while (fileSocketChannel.read(buffer) != -1) {
+					
+					buffer.flip();
+					while (buffer.hasRemaining()) {
+						fileChannel.write(buffer);
+					}
+					buffer.clear();
+				}
+				
+				fileSocketChannel.close();
+				fileChannel.close();
+			} catch (IOException e) {
+				System.err.println(e);
 			}
-			
-			fileChannel.close();
-			fileSocketChannel.close();
-		} catch (IOException e) {
-			System.err.println(e);
 		}
 	}
 

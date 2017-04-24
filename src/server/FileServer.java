@@ -183,6 +183,8 @@ public class FileServer implements Runnable {
 						receiveBuff.clear();
 						while (keyChannel.read(receiveBuff) != -1) {
 							receiveBuff.flip();
+							System.out.println(charset.decode(receiveBuff));
+							receiveBuff.rewind();
 							while (receiveBuff.hasRemaining()) {
 								fileChannel.write(receiveBuff);
 							}
