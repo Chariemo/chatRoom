@@ -182,11 +182,11 @@ public class Server {
 					}
 				}
 				isEnd = false;
-				buffer.flip();
 				int limit = buffer.limit();
 
 				if (ispacketHead && buffer.remaining() >= 4) { // 够一个字节
-
+					
+					buffer.flip();
 					int sizeOfData = buffer.getInt();
 					if (sizeOfData <= buffer.remaining()) {
 
@@ -223,6 +223,7 @@ public class Server {
 					continue;
 				} else if (!ispacketHead) {
 
+					buffer.flip();
 					if (buffer.remaining() < nextPacekt.remaining()) {
 
 						nextPacekt.put(buffer);
